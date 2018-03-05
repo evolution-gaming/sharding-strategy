@@ -36,15 +36,30 @@ class ShardingStrategySerializer(system: ExtendedActorSystem) extends Serializer
 
   private def strategyKeyFromBinary(bytes: Array[Byte]) = {
     val buffer = ByteBuffer.wrap(bytes)
-    val address = serialization.deserialize(readBytes(buffer), classOf[Address]).get
+    val identifier = buffer.getInt()
+    val manifest = readStr(buffer)
+    val address =
+      if (manifest.nonEmpty) serialization.deserialize(bytes, identifier, manifest).get.asInstanceOf[Address]
+      else serialization.deserialize(bytes, identifier, Some(classOf[Address])).get
     val shard = readStr(buffer)
     AdaptiveStrategy.Key(address, shard)
   }
 
   private def strategyKeyToBinary(x: AdaptiveStrategy.Key) = {
-    val bytesAddress = serialization.serialize(x.address).get
+    val address = x.address
+    val serializer = serialization.findSerializerFor(address)
+    val bytesAddress = serializer.toBinary(address)
+    val manifest = serializer match {
+      case serializer: SerializerWithStringManifest => serializer.manifest(address)
+      case _ if serializer.includeManifest          => address.getClass.getName
+      case _                                        => ""
+    }
+    val bytesManifest = manifest.getBytes("UTF-8")
     val bytesShard = x.shard.getBytes("UTF-8")
-    val buffer = ByteBuffer.allocate(4 + 4 + bytesAddress.length + bytesShard.length)
+    val buffer = ByteBuffer.allocate(4 + 4 + 4 + 4 + bytesManifest.length + bytesAddress.length + bytesShard.length)
+    buffer.putInt(serializer.identifier)
+    buffer.putInt(bytesManifest.length)
+    buffer.put(bytesManifest)
     buffer.putInt(bytesAddress.length)
     buffer.put(bytesAddress)
     buffer.putInt(bytesShard.length)
