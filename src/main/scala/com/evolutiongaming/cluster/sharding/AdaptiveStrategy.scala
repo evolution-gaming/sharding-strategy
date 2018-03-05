@@ -5,6 +5,7 @@ import akka.cluster.Cluster
 import akka.cluster.ddata.Replicator.WriteLocal
 import akka.cluster.ddata._
 import akka.cluster.sharding.ShardRegion
+import akka.cluster.sharding.ShardRegion.ExtractShardId
 import com.evolutiongaming.cluster.ddata.SafeReplicator
 import com.evolutiongaming.cluster.ddata.SafeReplicator.UpdateFailure
 import com.evolutiongaming.safeakka.actor.ActorLog
@@ -138,29 +139,13 @@ object AdaptiveStrategy {
 
   type Weight = Int
 
-  
   type MsgWeight = ShardRegion.Msg => Weight
 
   object MsgWeight {
-
     lazy val Increment: MsgWeight = _ => 1
-
-    def extractShardId(
-      counters: Counters,
-      extractShardId: ShardRegion.ExtractShardId,
-      msgWeight: MsgWeight): ShardRegion.ExtractShardId = {
-
-      case msg: ShardRegion.StartEntity => extractShardId(msg)
-
-      case msg =>
-        val weight = msgWeight(msg)
-        val shardId = extractShardId(msg)
-        if (weight > 0) counters.increase(shardId, weight)
-        shardId
-    }
   }
 
-  
+
   def apply(
     typeName: String,
     rebalanceThresholdPercent: Int,
@@ -173,6 +158,21 @@ object AdaptiveStrategy {
       rebalanceThresholdPercent = rebalanceThresholdPercent,
       toAddress = toAddress,
       counters = counters)
+  }
+
+
+  def extractShardId(
+    counters: Counters,
+    extractShardId: ExtractShardId,
+    msgWeight: MsgWeight): ExtractShardId = {
+
+    case msg: ShardRegion.StartEntity => extractShardId(msg)
+
+    case msg =>
+      val weight = msgWeight(msg)
+      val shardId = extractShardId(msg)
+      if (weight > 0) counters.increase(shardId, weight)
+      shardId
   }
 
 
@@ -259,4 +259,25 @@ object AdaptiveStrategy {
   }
 
   case class Key(address: Address, shard: Shard)
+}
+
+
+object AdaptiveStrategyAndExtractShardId {
+
+  def apply(
+    typeName: String,
+    rebalanceThresholdPercent: Int,
+    msgWeight: AdaptiveStrategy.MsgWeight,
+    extractShardId: ExtractShardId)
+    (implicit system: ActorSystem): (AdaptiveStrategy, ExtractShardId) = {
+
+    val counters = AdaptiveStrategy.CountersExtension(system)(typeName)
+    val absoluteAddress = AbsoluteAddress(system)
+    val adaptiveExtractShardId = AdaptiveStrategy.extractShardId(counters, extractShardId, msgWeight)
+    val adaptiveStrategy = new AdaptiveStrategy(
+      rebalanceThresholdPercent = rebalanceThresholdPercent,
+      counters = counters,
+      toAddress = region => absoluteAddress(region.path.address))
+    (adaptiveStrategy, adaptiveExtractShardId)
+  }
 }
