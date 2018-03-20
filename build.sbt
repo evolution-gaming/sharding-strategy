@@ -37,6 +37,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-cluster-sharding" % "2.5.9",
   "com.typesafe.akka" %% "akka-testkit" % "2.5.9" % Test,
   "com.evolutiongaming" %% "safe-actor" % "1.4",
+  "org.mockito" % "mockito-core" % "2.16.0" % Test,
   "org.scalatest" %% "scalatest" % "3.0.5" % Test)
 
 licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))
