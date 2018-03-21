@@ -90,13 +90,11 @@ object ShardingStrategy {
           } yield (region, shards)
 
           if (included.isEmpty) None
-          else {
-            val region = strategy.allocate(requester, shard, included)
-            region flatMap { region =>
-              if (included contains region) Some(region)
-              else if (included contains requester) Some(requester)
-              else included.keys.headOption
-            }
+          else strategy.allocate(requester, shard, included) match {
+            case Some(region) if included contains region => Some(region)
+            case Some(_) if included contains requester   => Some(requester)
+            case Some(_)                                  => included.keys.headOption
+            case None                                     => None
           }
 
         case None       => strategy.allocate(requester, shard, current)
