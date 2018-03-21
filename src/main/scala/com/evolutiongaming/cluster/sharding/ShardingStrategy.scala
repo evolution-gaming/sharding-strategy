@@ -86,14 +86,16 @@ object ShardingStrategy {
 
           val included = for {
             (memberAddress, roles) <- clusterMembersWithRoles if roles contains role
-            region <- current.filter { case (region, _) => toAddress(region) == memberAddress }
-          } yield region
+            (region, shards) <- current if toAddress(region) == memberAddress
+          } yield (region, shards)
 
           if (included.isEmpty) None
           else {
             val region = strategy.allocate(requester, shard, included)
             region flatMap { region =>
-              if (included contains region) Some(region) else included.keys.headOption
+              if (included contains region) Some(region)
+              else if (included contains requester) Some(requester)
+              else included.keys.headOption
             }
           }
 
