@@ -4,7 +4,7 @@ import akka.actor.Address
 import akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy
 
 import scala.collection.immutable.IndexedSeq
-import scala.collection.{immutable, mutable}
+import scala.collection.mutable
 import scala.compat.Platform
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
@@ -76,8 +76,7 @@ object ShardingStrategy {
   class FilterByRole(
     shardRole: Shard => Option[String],
     toAddress: Region => Address,
-    toGlobal: Address => Address,
-    clusterMembers: => immutable.SortedSet[akka.cluster.Member],
+    clusterMembersWithRoles: => Map[Address, Set[String]],
     strategy: ShardingStrategy) extends ShardingStrategy {
 
     def allocate(requester: Region, shard: Shard, current: Allocation): Option[Region] = {
@@ -85,10 +84,10 @@ object ShardingStrategy {
       shardRole(shard) match {
         case Some(role) =>
 
-          val included = (for {
-            member <- clusterMembers if member.roles contains role
-            region <- current.filter { case (region, _) => toGlobal(toAddress(region)) == toGlobal(member.address) }
-          } yield region).toMap
+          val included = for {
+            (memberAddress, roles) <- clusterMembersWithRoles if roles contains role
+            region <- current.filter { case (region, _) => toAddress(region) == memberAddress }
+          } yield region
 
           if (included.isEmpty) None
           else {
@@ -104,13 +103,9 @@ object ShardingStrategy {
 
     def rebalance(current: Allocation, inProgress: Set[Shard]): List[Shard] = {
 
-      val addressRoles = (for {
-        member <- clusterMembers
-      } yield toGlobal(member.address) -> member.roles).toMap
-
       val excludedShards = (for {
         (region, shards) <- current
-        regionRoles = addressRoles.getOrElse(toGlobal(toAddress(region)), Set.empty)
+        regionRoles = clusterMembersWithRoles.getOrElse(toAddress(region), Set.empty)
         shard <- shards
         shardRole <- shardRole(shard) if !(regionRoles contains shardRole)
       } yield shard).toSet
@@ -274,9 +269,8 @@ object ShardingStrategy {
     def filterByRole(
       shardRole: Shard => Option[String],
       toAddress: Region => Address,
-      toGlobal: Address => Address,
-      clusterMembers: => immutable.SortedSet[akka.cluster.Member]): ShardingStrategy =
-      new FilterByRole(shardRole, toAddress, toGlobal, clusterMembers, self)
+      clusterMembersWithRoles: => Map[Address, Set[String]]): ShardingStrategy =
+      new FilterByRole(shardRole, toAddress, clusterMembersWithRoles, self)
 
     def shardRebalanceCooldown(cooldown: FiniteDuration): ShardingStrategy = new ShardRebalanceCooldown(cooldown, self)
 

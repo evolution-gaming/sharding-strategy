@@ -1,15 +1,11 @@
 package com.evolutiongaming.cluster.sharding
 
 import akka.actor.{Actor, ActorRef, Address, Props}
-import akka.cluster.UniqueAddress
-import org.mockito.Mockito._
-import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Matchers, WordSpec}
 
 import scala.collection.immutable.IndexedSeq
-import scala.collection.immutable
 
-class ShardingStrategySpec extends WordSpec with ActorSpec  with MockitoSugar with Matchers {
+class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
 
   "ShardingStrategy" should {
 
@@ -60,38 +56,17 @@ class ShardingStrategySpec extends WordSpec with ActorSpec  with MockitoSugar wi
       val address2 = newAddress("127.0.0.2")
       val address3 = newAddress("127.0.0.3")
 
-      val node1 = {
-        val node = mock[akka.cluster.Member]
-        when(node.roles) thenReturn Set("role1", "role4")
-        when(node.address) thenReturn address1
-        when(node.uniqueAddress) thenReturn UniqueAddress(address1, 1L)
-       node
-      }
-
-      val node2 = {
-        val node = mock[akka.cluster.Member]
-        when(node.roles) thenReturn Set("role2", "role3")
-        when(node.address) thenReturn address2
-        when(node.uniqueAddress) thenReturn UniqueAddress(address2, 2L)
-        node
-      }
-
-      val node3 = {
-        val node = mock[akka.cluster.Member]
-        when(node.roles) thenReturn Set("role4", "role")
-        when(node.address) thenReturn address3
-        when(node.uniqueAddress) thenReturn UniqueAddress(address3, 3L)
-        node
-      }
-
-      val clusterMembers = immutable.SortedSet(node1, node2, node3)
+      val clusterMembers = Map(
+        address1 -> Set("role1", "role4"),
+        address2 -> Set("role2", "role3"),
+        address3 -> Set("role4", "role"))
 
       val toAddress = Map(
         region1 -> address1,
         region2 -> address2,
         region3 -> address3)
 
-      val strategy = stub.filterByRole(shardRole, toAddress, identity, clusterMembers)
+      val strategy = stub.filterByRole(shardRole, toAddress, clusterMembers)
 
       val allocation = Map(
         region1 -> IndexedSeq(shard1),
