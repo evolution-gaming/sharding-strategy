@@ -17,7 +17,7 @@ class MappedStrategy private(
   mapping: MappedStrategy.Mapping,
   toAddress: Region => Address) extends ShardingStrategy {
 
-  def allocate(requester: Region, shard: Shard, current: Allocation) = {
+  def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = {
     for {
       address <- mapping get shard
       region <- regionByAddress(address, current)

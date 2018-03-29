@@ -24,7 +24,7 @@ class AdaptiveStrategy(
 
   private val toRebalance = TrieMap.empty[Shard, Address]
 
-  def allocate(requester: Region, shard: Shard, current: Allocation) = {
+  def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = {
     val addresses = toAddresses(current)
 
     val address = toRebalance.get(shard) filter addresses.contains orElse {

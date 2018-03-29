@@ -7,7 +7,7 @@ import scala.util.Random
 
 object AlwaysRebalanceStrategy extends ShardingStrategy {
 
-  def allocate(requester: ActorRef, shard: Shard, current: Allocation) = {
+  def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = {
     Random.shuffle(current.keys).headOption
   }
 

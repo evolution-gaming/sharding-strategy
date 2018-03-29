@@ -1,6 +1,6 @@
 package com.evolutiongaming.cluster.sharding
 
-import akka.actor.Address
+import akka.actor.{ActorRef, Address}
 import akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy
 
 import scala.concurrent.duration.Duration
@@ -10,7 +10,7 @@ object AllocationStrategyHelper {
 
   class ShardingStrategyProxy(timeout: Duration, strategy: ShardAllocationStrategy) extends ShardingStrategy {
 
-    def allocate(requester: Region, shard: Shard, current: Allocation) = {
+    def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = {
       val region = await {
         strategy.allocateShard(requester, shard, current)
       }
