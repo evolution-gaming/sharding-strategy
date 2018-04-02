@@ -46,27 +46,30 @@ class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
       }
 
       def shardRole(shard: Shard): Option[String] = shard match {
-        case `shard1` => Some("role1")
-        case `shard2` => Some("role2")
-        case `shard3` => Some("role3")
+        case `shard1` => Some("special_role1")
+        case `shard2` => Some("special_role2")
+        case `shard3` => Some("special_role3")
         case `shard4` => None
       }
 
       val address1 = newAddress("127.0.0.1")
       val address2 = newAddress("127.0.0.2")
       val address3 = newAddress("127.0.0.3")
+      val address4 = newAddress("127.0.0.4")
 
       val clusterMembers = Map(
-        address1 -> Set("role1", "role4"),
-        address2 -> Set("role2", "role3"),
-        address3 -> Set("role4", "role"))
+        address1 -> Set("special_role1", "special_role4"),
+        address2 -> Set("special_role2", "special_role3"),
+        address3 -> Set("special_role4", "special_role"),
+        address4 -> Set("whatever_role"))
 
       val toAddress = Map(
         region1 -> address1,
         region2 -> address2,
-        region3 -> address3)
+        region3 -> address3,
+        region4 -> address4)
 
-      val strategy = stub.filterByRole(shardRole, toAddress, clusterMembers)
+      val strategy = stub.filterByRole(shardRole, toAddress, clusterMembers, "special_")
 
       val allocation = Map(
         region1 -> IndexedSeq(shard1),
@@ -83,6 +86,10 @@ class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
         region2 -> IndexedSeq(shard4, shard2),
         region3 -> IndexedSeq(shard1))
 
+      val emptyAllocation = Map(
+        region1 -> IndexedSeq.empty,
+        region4 -> IndexedSeq.empty)
+
       strategy.rebalance(wrongAllocation, Set.empty).sorted shouldEqual List(shard1, shard2, shard3)
       strategy.rebalance(partiallyWrongAllocation, Set.empty).sorted shouldEqual List(shard1, shard3)
       strategy.rebalance(allocation, Set.empty) shouldEqual Nil
@@ -91,7 +98,12 @@ class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
       strategy.allocate(ActorRef.noSender, region3, shard1, wrongAllocation) shouldEqual Some(region1)
       strategy.allocate(ActorRef.noSender, region3, shard2, wrongAllocation) shouldEqual Some(region2)
       strategy.allocate(ActorRef.noSender, region3, shard3, wrongAllocation) shouldEqual Some(region2)
-      strategy.allocate(ActorRef.noSender, region3, shard4, wrongAllocation) shouldEqual Some(region3)
+      strategy.allocate(ActorRef.noSender, region3, shard4, wrongAllocation) shouldEqual None
+
+      strategy.allocate(ActorRef.noSender, region3, shard1, emptyAllocation) shouldEqual Some(region1)
+      strategy.allocate(ActorRef.noSender, region3, shard2, emptyAllocation) shouldEqual Some(region4)
+      strategy.allocate(ActorRef.noSender, region3, shard3, emptyAllocation) shouldEqual Some(region4)
+      strategy.allocate(ActorRef.noSender, region3, shard4, emptyAllocation) shouldEqual Some(region4)
     }
 
     "threshold" in {

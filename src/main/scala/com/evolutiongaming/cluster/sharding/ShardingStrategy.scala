@@ -71,42 +71,70 @@ object ShardingStrategy {
 
 
   /**
-    * Per-shard allocation and rebalance based on matching shard's "role" with node roles
+    * Per-shard allocation and rebalance based on matching shard's "role" with "special" node roles.
+    * Non-matching shards should not be allocated on nodes with "special" roles.
+    * But shards with a "special" role may be allocated on nodes without any "special" role ("unified" nodes).
     */
   class FilterByRole(
     shardRole: Shard => Option[String],
     toAddress: Region => Address,
     clusterMembersWithRoles: => Map[Address, Set[String]],
+    specialRolePrefix: String,
     strategy: ShardingStrategy) extends ShardingStrategy {
 
     def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation): Option[Region] = {
 
-      shardRole(shard) match {
-        case Some(role) =>
+      val clusterMembers = clusterMembersWithRoles // just cache it locally
 
-          val included = for {
-            (memberAddress, roles) <- clusterMembersWithRoles if roles contains role
-            (region, shards) <- current if toAddress(region) == memberAddress
-          } yield (region, shards)
+      val specialRoles = (clusterMembers.values.flatten filter (_.startsWith(specialRolePrefix))).toSet
 
-          if (included.isEmpty) None
-          else strategy.allocate(requesterRef, requester, shard, included) flatMap {
-            case region if included contains region => Some(region)
-            case _ if included contains requester   => Some(requester)
-            case _                                  => included.keys.headOption
-          }
+      if (specialRoles.isEmpty) {
+        strategy.allocate(requesterRef, requester, shard, current)
+      } else {
+        shardRole(shard) match {
+          case Some(role) if role startsWith specialRolePrefix =>
 
-        case None       => strategy.allocate(requesterRef, requester, shard, current)
+            val included = for {
+              (memberAddress, roles) <- clusterMembers if (roles contains role) || (roles intersect specialRoles).isEmpty
+              (region, shards) <- current if toAddress(region) == memberAddress
+            } yield (region, shards)
+
+            if (included.isEmpty) None
+            else strategy.allocate(requesterRef, requester, shard, included) flatMap {
+              case region if included contains region => Some(region)
+              case _ if included contains requester   => Some(requester)
+              case _                                  => included.keys.headOption
+            }
+
+          case _                                               =>
+            val includedAddresses = (clusterMembers collect {
+              case (address, roles) if (roles intersect specialRoles).isEmpty => address
+            }).toSet
+
+            val included = current filterKeys { region =>
+              includedAddresses contains toAddress(region)
+            }
+
+            if (included.isEmpty) None
+            else {
+              val region = strategy.allocate(requesterRef, requester, shard, included)
+              if (included contains requester) region
+              else region filter (_ != requester) orElse included.keys.headOption
+            }
+        }
       }
     }
 
     def rebalance(current: Allocation, inProgress: Set[Shard]): List[Shard] = {
 
+      // rebalance wrong shards from nodes with special roles
+
       val excludedShards = (for {
         (region, shards) <- current
-        regionRoles = clusterMembersWithRoles.getOrElse(toAddress(region), Set.empty)
+        regionSpecialRoles = clusterMembersWithRoles.getOrElse(toAddress(region), Set.empty) filter (_.startsWith(specialRolePrefix))
+        if regionSpecialRoles.nonEmpty
         shard <- shards
-        shardRole <- shardRole(shard) if !(regionRoles contains shardRole)
+        shardRole <- shardRole(shard) if !(regionSpecialRoles contains shardRole)
       } yield shard).toSet
 
       val included = current map {
@@ -275,8 +303,9 @@ object ShardingStrategy {
     def filterByRole(
       shardRole: Shard => Option[String],
       toAddress: Region => Address,
-      clusterMembersWithRoles: => Map[Address, Set[String]]): ShardingStrategy =
-      new FilterByRole(shardRole, toAddress, clusterMembersWithRoles, self)
+      clusterMembersWithRoles: => Map[Address, Set[String]],
+      specialRolePrefix: String): ShardingStrategy =
+      new FilterByRole(shardRole, toAddress, clusterMembersWithRoles, specialRolePrefix, self)
 
     def shardRebalanceCooldown(cooldown: FiniteDuration): ShardingStrategy = new ShardRebalanceCooldown(cooldown, self)
 
