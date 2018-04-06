@@ -70,55 +70,6 @@ object ShardingStrategy {
   }
 
 
-  /**
-    * Per-shard allocation and rebalance based on matching shard's "role" with node roles
-    */
-  class FilterByRole(
-    shardRole: Shard => Option[String],
-    toAddress: Region => Address,
-    clusterMembersWithRoles: => Map[Address, Set[String]],
-    strategy: ShardingStrategy) extends ShardingStrategy {
-
-    def allocate(requester: Region, shard: Shard, current: Allocation): Option[Region] = {
-
-      shardRole(shard) match {
-        case Some(role) =>
-
-          val included = for {
-            (memberAddress, roles) <- clusterMembersWithRoles if roles contains role
-            (region, shards) <- current if toAddress(region) == memberAddress
-          } yield (region, shards)
-
-          if (included.isEmpty) None
-          else strategy.allocate(requester, shard, included) flatMap {
-            case region if included contains region => Some(region)
-            case _ if included contains requester   => Some(requester)
-            case _                                  => included.keys.headOption
-          }
-
-        case None       => strategy.allocate(requester, shard, current)
-      }
-    }
-
-    def rebalance(current: Allocation, inProgress: Set[Shard]): List[Shard] = {
-
-      val excludedShards = (for {
-        (region, shards) <- current
-        regionRoles = clusterMembersWithRoles.getOrElse(toAddress(region), Set.empty)
-        shard <- shards
-        shardRole <- shardRole(shard) if !(regionRoles contains shardRole)
-      } yield shard).toSet
-
-      val included = current map {
-        case (region, shards) => region -> shards.filter(shard => !(excludedShards contains shard))
-      }
-
-      val shards = strategy.rebalance(included, inProgress)
-      (excludedShards ++ shards).toList
-    }
-  }
-
-
   class Threshold(n: => Int, strategy: ShardingStrategy) extends ShardingStrategy {
 
     def allocate(requester: Region, shard: Shard, current: Allocation) = {
@@ -261,15 +212,6 @@ object ShardingStrategy {
     def filterRegions(f: Region => Boolean): ShardingStrategy = new FilterRegions(f, self)
 
     def filterShards(f: Shard => Boolean): ShardingStrategy = new FilterShards(f, self)
-
-    /**
-      * Per-shard allocation and rebalance based on matching shard's "role" with node roles
-      */
-    def filterByRole(
-      shardRole: Shard => Option[String],
-      toAddress: Region => Address,
-      clusterMembersWithRoles: => Map[Address, Set[String]]): ShardingStrategy =
-      new FilterByRole(shardRole, toAddress, clusterMembersWithRoles, self)
 
     def shardRebalanceCooldown(cooldown: FiniteDuration): ShardingStrategy = new ShardRebalanceCooldown(cooldown, self)
 

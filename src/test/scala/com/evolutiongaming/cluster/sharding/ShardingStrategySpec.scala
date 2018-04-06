@@ -1,6 +1,6 @@
 package com.evolutiongaming.cluster.sharding
 
-import akka.actor.{Actor, ActorRef, Address, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import org.scalatest.{Matchers, WordSpec}
 
 import scala.collection.immutable.IndexedSeq
@@ -37,61 +37,6 @@ class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
         region2 -> IndexedSeq(shard2, shard3))
       strategy.rebalance(allocation, Set.empty) shouldEqual List(shard1, shard2)
       strategy.rebalance(allocation, Set(shard4)) shouldEqual List(shard1)
-    }
-
-    "filterByRole" in {
-      val stub = new ShardingStrategy {
-        def allocate(requester: ActorRef, shard: Shard, current: Allocation) = Some(requester)
-        def rebalance(current: Allocation, inProgress: Set[Shard]) = Nil
-      }
-
-      def shardRole(shard: Shard): Option[String] = shard match {
-        case `shard1` => Some("role1")
-        case `shard2` => Some("role2")
-        case `shard3` => Some("role3")
-        case `shard4` => None
-      }
-
-      val address1 = newAddress("127.0.0.1")
-      val address2 = newAddress("127.0.0.2")
-      val address3 = newAddress("127.0.0.3")
-
-      val clusterMembers = Map(
-        address1 -> Set("role1", "role4"),
-        address2 -> Set("role2", "role3"),
-        address3 -> Set("role4", "role"))
-
-      val toAddress = Map(
-        region1 -> address1,
-        region2 -> address2,
-        region3 -> address3)
-
-      val strategy = stub.filterByRole(shardRole, toAddress, clusterMembers)
-
-      val allocation = Map(
-        region1 -> IndexedSeq(shard1),
-        region2 -> IndexedSeq(shard2, shard3),
-        region3 -> IndexedSeq(shard4))
-
-      val wrongAllocation = Map(
-        region1 -> IndexedSeq(shard3),
-        region2 -> IndexedSeq(shard4, shard1),
-        region3 -> IndexedSeq(shard2))
-
-      val partiallyWrongAllocation = Map(
-        region1 -> IndexedSeq(shard3),
-        region2 -> IndexedSeq(shard4, shard2),
-        region3 -> IndexedSeq(shard1))
-
-      strategy.rebalance(wrongAllocation, Set.empty).sorted shouldEqual List(shard1, shard2, shard3)
-      strategy.rebalance(partiallyWrongAllocation, Set.empty).sorted shouldEqual List(shard1, shard3)
-      strategy.rebalance(allocation, Set.empty) shouldEqual Nil
-      strategy.rebalance(Map.empty, Set.empty) shouldEqual Nil
-
-      strategy.allocate(region3, shard1, wrongAllocation) shouldEqual Some(region1)
-      strategy.allocate(region3, shard2, wrongAllocation) shouldEqual Some(region2)
-      strategy.allocate(region3, shard3, wrongAllocation) shouldEqual Some(region2)
-      strategy.allocate(region3, shard4, wrongAllocation) shouldEqual Some(region3)
     }
 
     "threshold" in {
@@ -284,7 +229,6 @@ class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
   val shard7 = "shard7"
   val shard8 = "shard8"
 
-  def newAddress(ip: String) = Address("", "", ip, 2552)
 
   def newRegion() = {
     def actor = new Actor {
