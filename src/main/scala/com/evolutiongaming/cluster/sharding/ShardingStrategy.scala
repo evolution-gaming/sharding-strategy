@@ -1,6 +1,6 @@
 package com.evolutiongaming.cluster.sharding
 
-import akka.actor.{ActorRef, Address}
+import akka.actor.Address
 import akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy
 
 import scala.collection.immutable.IndexedSeq
@@ -11,7 +11,7 @@ import scala.concurrent.duration.FiniteDuration
 
 trait ShardingStrategy {
 
-  def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation): Option[Region]
+  def allocate(requester: Region, shard: Shard, current: Allocation): Option[Region]
 
   def rebalance(current: Allocation, inProgress: Set[Shard]): List[Shard]
 }
@@ -20,8 +20,8 @@ object ShardingStrategy {
 
   class TakeShards(n: => Int, strategy: ShardingStrategy) extends ShardingStrategy {
 
-    def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = {
-      strategy.allocate(requesterRef, requester, shard, current)
+    def allocate(requester: Region, shard: Shard, current: Allocation) = {
+      strategy.allocate(requester, shard, current)
     }
 
     def rebalance(current: Allocation, inProgress: Set[Shard]) = {
@@ -34,12 +34,12 @@ object ShardingStrategy {
 
   class FilterRegions(f: Region => Boolean, strategy: ShardingStrategy) extends ShardingStrategy {
 
-    def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = {
+    def allocate(requester: Region, shard: Shard, current: Allocation) = {
       val included = current.filter { case (region, _) => f(region) }
 
       if (included.isEmpty) None
       else {
-        val region = strategy.allocate(requesterRef, requester, shard, included)
+        val region = strategy.allocate(requester, shard, included)
         if (included contains requester) region
         else region filter (_ != requester) orElse included.keys.headOption
       }
@@ -59,8 +59,8 @@ object ShardingStrategy {
 
   class FilterShards(f: Shard => Boolean, strategy: ShardingStrategy) extends ShardingStrategy {
 
-    def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = {
-      strategy.allocate(requesterRef, requester, shard, current)
+    def allocate(requester: Region, shard: Shard, current: Allocation) = {
+      strategy.allocate(requester, shard, current)
     }
 
     def rebalance(current: Allocation, inProgress: Set[Shard]) = {
@@ -79,7 +79,7 @@ object ShardingStrategy {
     clusterMembersWithRoles: => Map[Address, Set[String]],
     strategy: ShardingStrategy) extends ShardingStrategy {
 
-    def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation): Option[Region] = {
+    def allocate(requester: Region, shard: Shard, current: Allocation): Option[Region] = {
 
       shardRole(shard) match {
         case Some(role) =>
@@ -90,13 +90,13 @@ object ShardingStrategy {
           } yield (region, shards)
 
           if (included.isEmpty) None
-          else strategy.allocate(requesterRef, requester, shard, included) flatMap {
+          else strategy.allocate(requester, shard, included) flatMap {
             case region if included contains region => Some(region)
             case _ if included contains requester   => Some(requester)
             case _                                  => included.keys.headOption
           }
 
-        case None       => strategy.allocate(requesterRef, requester, shard, current)
+        case None       => strategy.allocate(requester, shard, current)
       }
     }
 
@@ -121,8 +121,8 @@ object ShardingStrategy {
 
   class Threshold(n: => Int, strategy: ShardingStrategy) extends ShardingStrategy {
 
-    def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = {
-      strategy.allocate(requesterRef, requester, shard, current)
+    def allocate(requester: Region, shard: Shard, current: Allocation) = {
+      strategy.allocate(requester, shard, current)
     }
 
     def rebalance(current: Allocation, inProgress: Set[Shard]) = {
@@ -134,7 +134,7 @@ object ShardingStrategy {
 
   object Empty extends ShardingStrategy {
 
-    def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = None
+    def allocate(requester: Region, shard: Shard, current: Allocation) = None
 
     def rebalance(current: Allocation, inProgress: Set[Shard]) = Nil
   }
@@ -142,27 +142,20 @@ object ShardingStrategy {
 
   object RequesterAllocation extends ShardingStrategy {
 
-    def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = Some(requester)
+    def allocate(requester: Region, shard: Shard, current: Allocation) = Some(requester)
 
     def rebalance(current: Allocation, inProgress: Set[Shard]) = Nil
   }
 
 
-  class AllocationStrategyProxy(
-    strategy: ShardingStrategy,
-    toAddress: Region => Address,
-    fallback: Allocate = Allocate.Default)
+  class AllocationStrategyProxy(strategy: ShardingStrategy, fallback: Allocate = Allocate.Default)
     extends ShardAllocationStrategy {
 
-    def allocateShard(requesterRef: Region, shardId: Shard, current: Allocation) = {
-      val requesterRefAddress = toAddress(requesterRef)
-      val requesterRegion = current.keys find { region =>
-        toAddress(region) == requesterRefAddress
-      } getOrElse requesterRef
-      if (current.size <= 1) Future.successful(requesterRegion)
+    def allocateShard(requester: Region, shardId: Shard, current: Allocation) = {
+      if (current.size <= 1) Future.successful(requester)
       else {
-        val region = strategy.allocate(requesterRef, requesterRegion, shardId, current) getOrElse {
-          fallback(requesterRegion, shardId, current)
+        val region = strategy.allocate(requester, shardId, current) getOrElse {
+          fallback(requester, shardId, current)
         }
         Future.successful(region)
       }
@@ -181,8 +174,8 @@ object ShardingStrategy {
     strategy: ShardingStrategy,
     toGlobal: Address => Address) extends ShardingStrategy {
 
-    def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = {
-      val region = strategy.allocate(requesterRef, requester, shard, current)
+    def allocate(requester: Region, shard: Shard, current: Allocation) = {
+      val region = strategy.allocate(requester, shard, current)
 
       def msg = s"allocate $shard to ${ region.fold("none") { regionToStr } }, " +
         s"requester: ${ regionToStr(requester) }, " +
@@ -233,8 +226,8 @@ object ShardingStrategy {
 
     private val allocationTime = mutable.Map.empty[Shard, Long]
 
-    def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = {
-      val region = strategy.allocate(requesterRef, requester, shard, current)
+    def allocate(requester: Region, shard: Shard, current: Allocation) = {
+      val region = strategy.allocate(requester, shard, current)
       allocationTime.put(shard, Platform.currentTime)
       region
     }
@@ -280,10 +273,8 @@ object ShardingStrategy {
 
     def shardRebalanceCooldown(cooldown: FiniteDuration): ShardingStrategy = new ShardRebalanceCooldown(cooldown, self)
 
-    def toAllocationStrategy(
-      toAddress: Region => Address,
-      fallback: Allocate = Allocate.Default): ShardAllocationStrategy = {
-      new AllocationStrategyProxy(self, toAddress, fallback)
+    def toAllocationStrategy(fallback: Allocate = Allocate.Default): ShardAllocationStrategy = {
+      new AllocationStrategyProxy(self, fallback)
     }
 
     def logging(toGlobal: Address => Address)(log: (() => String) => Unit): ShardingStrategy = {

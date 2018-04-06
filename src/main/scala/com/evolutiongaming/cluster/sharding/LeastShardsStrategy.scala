@@ -1,12 +1,10 @@
 package com.evolutiongaming.cluster.sharding
 
-import akka.actor.ActorRef
-
 object LeastShardsStrategy extends ShardingStrategy {
 
   private val reversedOrdering = Ordering[Int].reverse
 
-  def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = {
+  def allocate(requester: Region, shard: Shard, current: Allocation) = {
 
     val zero = (Int.MaxValue, List.empty[Region])
     val (min, regions) = current.foldLeft(zero) { case ((min, regions), (region, shards)) =>

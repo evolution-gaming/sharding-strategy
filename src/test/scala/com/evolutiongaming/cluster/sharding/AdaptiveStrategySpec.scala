@@ -1,6 +1,6 @@
 package com.evolutiongaming.cluster.sharding
 
-import akka.actor.{Actor, ActorRef, Address, Props}
+import akka.actor.{Actor, Address, Props}
 import com.evolutiongaming.cluster.sharding.AdaptiveStrategy._
 import org.scalatest.{Matchers, WordSpec}
 
@@ -14,7 +14,7 @@ class AdaptiveStrategySpec extends WordSpec with ActorSpec with Matchers {
     "allocate" should {
 
       "return None when counters are empty" in new Scope {
-        strategy.allocate(ActorRef.noSender, region1, shard1, allocation) shouldEqual None
+        strategy.allocate(region1, shard1, allocation) shouldEqual None
       }
 
       "return None if all have same counters" in new Scope {
@@ -22,35 +22,35 @@ class AdaptiveStrategySpec extends WordSpec with ActorSpec with Matchers {
         countersMap.put(AdaptiveStrategy.Key(address2, shard1), 2)
         countersMap.put(AdaptiveStrategy.Key(address3, shard1), 2)
 
-        strategy.allocate(ActorRef.noSender, region1, shard1, allocation) shouldEqual None
-        strategy.allocate(ActorRef.noSender, region2, shard1, allocation) shouldEqual None
-        strategy.allocate(ActorRef.noSender, region3, shard1, allocation) shouldEqual None
+        strategy.allocate(region1, shard1, allocation) shouldEqual None
+        strategy.allocate(region2, shard1, allocation) shouldEqual None
+        strategy.allocate(region3, shard1, allocation) shouldEqual None
       }
 
       "return region with max counters" in new Scope {
         counters.increase(shard1, 1)
 
-        strategy.allocate(ActorRef.noSender, region2, shard1, allocation) shouldEqual Some(region1)
+        strategy.allocate(region2, shard1, allocation) shouldEqual Some(region1)
       }
 
       "return region decided in rebalance" in new Scope {
         counters.increase(shard2, 2)
         strategy.rebalance(allocation, Set.empty) shouldEqual List(shard2)
-        strategy.allocate(ActorRef.noSender, region2, shard2, allocation) shouldEqual Some(region1)
+        strategy.allocate(region2, shard2, allocation) shouldEqual Some(region1)
       }
 
       "return requester if it has the max counter" in new Scope {
         countersMap.put(AdaptiveStrategy.Key(address1, shard1), 2)
         countersMap.put(AdaptiveStrategy.Key(address2, shard1), 2)
 
-        strategy.allocate(ActorRef.noSender, region1, shard1, allocation) shouldEqual Some(region1)
+        strategy.allocate(region1, shard1, allocation) shouldEqual Some(region1)
       }
 
       "return region and fix counters" in new Scope {
         countersMap.put(AdaptiveStrategy.Key(address1, shard1), 2)
         countersMap.put(AdaptiveStrategy.Key(address2, shard1), 4)
 
-        strategy.allocate(ActorRef.noSender, region1, shard1, allocation) shouldEqual Some(region1)
+        strategy.allocate(region1, shard1, allocation) shouldEqual Some(region1)
       }
 
       "not reset counters if not allocated" in new Scope {
@@ -58,14 +58,14 @@ class AdaptiveStrategySpec extends WordSpec with ActorSpec with Matchers {
         countersMap.put(AdaptiveStrategy.Key(address2, shard1), 2)
         countersMap.put(AdaptiveStrategy.Key(address3, shard1), 2)
 
-        strategy.allocate(ActorRef.noSender, region1, shard1, allocation) shouldEqual None
+        strategy.allocate(region1, shard1, allocation) shouldEqual None
         counters.get(shard1, Set(address1)) shouldEqual Map(address1 -> BigInt(2))
       }
 
       "reset counters if allocated" in new Scope {
         counters.increase(shard1, 1)
 
-        strategy.allocate(ActorRef.noSender, region2, shard1, allocation) shouldEqual Some(region1)
+        strategy.allocate(region2, shard1, allocation) shouldEqual Some(region1)
         counters.get(shard1, Set(address1)) shouldEqual Map(address1 -> BigInt(0))
       }
     }

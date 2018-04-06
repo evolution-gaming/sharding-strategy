@@ -1,10 +1,10 @@
 package com.evolutiongaming.cluster.sharding
 
-import akka.actor.{ActorRef, Address}
+import akka.actor.Address
 
 class SingleNodeStrategy(address: => Option[Address], toAddress: Region => Address) extends ShardingStrategy {
 
-  def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = {
+  def allocate(requester: Region, shard: Shard, current: Allocation) = {
     for {
       address <- address
       region <- regionByAddress(address, current)

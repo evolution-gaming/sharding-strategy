@@ -12,7 +12,7 @@ class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
     "filterRegions" in {
 
       val stub = new ShardingStrategy {
-        def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = Some(requester)
+        def allocate(requester: ActorRef, shard: Shard, current: Allocation) = Some(requester)
         def rebalance(current: Allocation, inProgress: Set[Shard]) = Nil
       }
 
@@ -26,8 +26,8 @@ class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
       strategy.rebalance(allocation, Set.empty) shouldEqual List(shard2, shard3, shard4)
       strategy.rebalance(Map.empty, Set.empty) shouldEqual Nil
 
-      strategy.allocate(ActorRef.noSender, region2, shard2, Map(region2 -> IndexedSeq(shard1))) shouldEqual None
-      strategy.allocate(ActorRef.noSender, region1, shard2, Map(region1 -> IndexedSeq(shard1))) shouldEqual Some(region1)
+      strategy.allocate(region2, shard2, Map(region2 -> IndexedSeq(shard1))) shouldEqual None
+      strategy.allocate(region1, shard2, Map(region1 -> IndexedSeq(shard1))) shouldEqual Some(region1)
     }
 
     "takeShards" in {
@@ -41,7 +41,7 @@ class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
 
     "filterByRole" in {
       val stub = new ShardingStrategy {
-        def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = Some(requester)
+        def allocate(requester: ActorRef, shard: Shard, current: Allocation) = Some(requester)
         def rebalance(current: Allocation, inProgress: Set[Shard]) = Nil
       }
 
@@ -88,10 +88,10 @@ class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
       strategy.rebalance(allocation, Set.empty) shouldEqual Nil
       strategy.rebalance(Map.empty, Set.empty) shouldEqual Nil
 
-      strategy.allocate(ActorRef.noSender, region3, shard1, wrongAllocation) shouldEqual Some(region1)
-      strategy.allocate(ActorRef.noSender, region3, shard2, wrongAllocation) shouldEqual Some(region2)
-      strategy.allocate(ActorRef.noSender, region3, shard3, wrongAllocation) shouldEqual Some(region2)
-      strategy.allocate(ActorRef.noSender, region3, shard4, wrongAllocation) shouldEqual Some(region3)
+      strategy.allocate(region3, shard1, wrongAllocation) shouldEqual Some(region1)
+      strategy.allocate(region3, shard2, wrongAllocation) shouldEqual Some(region2)
+      strategy.allocate(region3, shard3, wrongAllocation) shouldEqual Some(region2)
+      strategy.allocate(region3, shard4, wrongAllocation) shouldEqual Some(region3)
     }
 
     "threshold" in {
@@ -107,19 +107,19 @@ class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
 
     "least shards" in {
       val strategy = LeastShardsStrategy
-      strategy.allocate(ActorRef.noSender, region1, shard2, Map(
+      strategy.allocate(region1, shard2, Map(
         region1 -> IndexedSeq(shard1),
         region2 -> IndexedSeq.empty)) shouldEqual Some(region2)
 
-      strategy.allocate(ActorRef.noSender, region1, shard1, Map(
+      strategy.allocate(region1, shard1, Map(
         region1 -> IndexedSeq.empty,
         region2 -> IndexedSeq.empty)) shouldEqual None
 
-      strategy.allocate(ActorRef.noSender, region1, shard3, Map(
+      strategy.allocate(region1, shard3, Map(
         region1 -> IndexedSeq(shard1),
         region2 -> IndexedSeq(shard2))) shouldEqual None
 
-      val region = strategy.allocate(ActorRef.noSender, region1, shard2, Map(
+      val region = strategy.allocate(region1, shard2, Map(
         region1 -> IndexedSeq(shard1),
         region2 -> IndexedSeq.empty,
         region3 -> IndexedSeq.empty)).get
@@ -182,35 +182,35 @@ class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
         .filterRegions(_ != region1)
         .takeShards(1)
 
-      strategy.allocate(ActorRef.noSender, region1, shard1, Map(region1 -> IndexedSeq())) shouldEqual None
-      strategy.allocate(ActorRef.noSender, region2, shard1, Map(region2 -> IndexedSeq())) shouldEqual None
-      strategy.allocate(ActorRef.noSender, region1, shard1, Map(region2 -> IndexedSeq())) shouldEqual Some(region2)
-      strategy.allocate(ActorRef.noSender, region1, shard1, Map(
+      strategy.allocate(region1, shard1, Map(region1 -> IndexedSeq())) shouldEqual None
+      strategy.allocate(region2, shard1, Map(region2 -> IndexedSeq())) shouldEqual None
+      strategy.allocate(region1, shard1, Map(region2 -> IndexedSeq())) shouldEqual Some(region2)
+      strategy.allocate(region1, shard1, Map(
         region1 -> IndexedSeq(),
         region2 -> IndexedSeq(),
         region3 -> IndexedSeq())) shouldEqual Some(region2)
 
-      strategy.allocate(ActorRef.noSender, region1, shard1, Map(
+      strategy.allocate(region1, shard1, Map(
         region1 -> IndexedSeq(),
         region2 -> IndexedSeq(),
         region2 -> IndexedSeq())) shouldEqual Some(region2)
 
-      strategy.allocate(ActorRef.noSender, region3, shard1, Map(
+      strategy.allocate(region3, shard1, Map(
         region1 -> IndexedSeq(),
         region2 -> IndexedSeq(),
         region3 -> IndexedSeq())) shouldEqual None
 
-      strategy.allocate(ActorRef.noSender, region1, shard1, Map(
+      strategy.allocate(region1, shard1, Map(
         region1 -> IndexedSeq(),
         region2 -> IndexedSeq(shard2),
         region3 -> IndexedSeq())) shouldEqual Some(region3)
 
-      strategy.allocate(ActorRef.noSender, region1, shard1, Map(
+      strategy.allocate(region1, shard1, Map(
         region1 -> IndexedSeq(),
         region2 -> IndexedSeq(shard2, shard3),
         region3 -> IndexedSeq())) shouldEqual Some(region3)
 
-      strategy.allocate(ActorRef.noSender, region1, shard1, Map(
+      strategy.allocate(region1, shard1, Map(
         region1 -> IndexedSeq(),
         region2 -> IndexedSeq(shard2, shard3),
         region3 -> IndexedSeq(shard4))) shouldEqual Some(region3)

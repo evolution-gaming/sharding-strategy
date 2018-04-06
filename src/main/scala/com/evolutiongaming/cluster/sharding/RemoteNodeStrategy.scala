@@ -7,7 +7,7 @@ object RemoteNodeStrategy extends ShardingStrategy {
 
   private def isLocal(region: ActorRef) = region.path.address.hasLocalScope
 
-  def allocate(requesterRef: ActorRef, requester: Region, shard: Shard, current: Allocation) = {
+  def allocate(requester: ActorRef, shard: Shard, current: Allocation) = {
     val regions = current.keys
     regions find { region => !isLocal(region) }
   }
