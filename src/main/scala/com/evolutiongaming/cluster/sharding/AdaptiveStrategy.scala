@@ -258,7 +258,7 @@ object AdaptiveStrategy {
     def createExtension(system: ExtendedActorSystem): CountersExtension = new CountersExtension()(system)
   }
 
-  case class Key(address: Address, shard: Shard)
+  final case class Key(address: Address, shard: Shard)
 }
 
 
