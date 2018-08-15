@@ -5,5 +5,5 @@
 ```scala
 resolvers += Resolver.bintrayRepo("evolutiongaming", "maven")
 
-libraryDependencies += "com.evolutiongaming" %% "sharding-strategy" % "0.0.1"
+libraryDependencies += "com.evolutiongaming" %% "sharding-strategy" % "0.0.8"
 ```
