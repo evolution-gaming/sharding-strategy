@@ -103,13 +103,10 @@ object ShardingStrategy {
     extends ShardAllocationStrategy {
 
     def allocateShard(requester: Region, shardId: Shard, current: Allocation) = {
-      if (current.size <= 1) Future.successful(requester)
-      else {
-        val region = strategy.allocate(requester, shardId, current) getOrElse {
-          fallback(requester, shardId, current)
-        }
-        Future.successful(region)
+      val region = strategy.allocate(requester, shardId, current) getOrElse {
+        fallback(requester, shardId, current)
       }
+      Future.successful(region)
     }
 
     def rebalance(current: Map[Region, IndexedSeq[Shard]], inProgress: Set[Shard]) = {
