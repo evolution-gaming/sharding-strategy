@@ -2,9 +2,8 @@ package com.evolutiongaming.cluster.sharding
 
 
 import akka.actor.{ActorRef, ActorSystem, Address, ExtendedActorSystem, Extension, ExtensionId}
-import akka.cluster.Cluster
 import akka.cluster.ddata.Replicator.{ReadLocal, WriteLocal}
-import akka.cluster.ddata.{LWWMap, LWWMapKey, Replicator, ReplicatorSettings}
+import akka.cluster.ddata.{DistributedData, LWWMap, LWWMapKey, Replicator, ReplicatorSettings}
 import com.evolutiongaming.cluster.ddata.SafeReplicator
 import com.evolutiongaming.cluster.ddata.SafeReplicator.{GetFailure, UpdateFailure}
 import com.evolutiongaming.safeakka.actor.ActorLog
@@ -61,10 +60,10 @@ object MappedStrategy {
 
   object Mapping {
     def apply(typeName: String, replicatorRef: ActorRef)(implicit system: ActorSystem): Mapping = {
-      implicit val cluster = Cluster(system)
       implicit val ec = system.dispatcher
       implicit val writeConsistency = WriteLocal
       implicit val readConsistency = ReadLocal
+      val selfUniqueAddress = DistributedData(system).selfUniqueAddress
 
       val dataKey = LWWMapKey[Shard, Address](s"MappedStrategy-$typeName")
       val replicator = SafeReplicator(dataKey, 30.seconds, replicatorRef)
@@ -98,7 +97,7 @@ object MappedStrategy {
             if (mapped(data.entries) && mapped(cache)) {
               Future.successful(false.asRight)
             } else {
-              val result = replicator.update { data => (data getOrElse empty) + (shard -> address) }
+              val result = replicator.update { data => (data getOrElse empty).put(selfUniqueAddress, shard, address) }
               result.map {
                 case Right(())                                   => true.asRight
                 case Left(UpdateFailure.Failure(message, cause)) => (s"$onFailure: $message $cause", Some(cause)).asLeft

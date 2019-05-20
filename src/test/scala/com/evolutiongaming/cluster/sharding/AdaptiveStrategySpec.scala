@@ -104,6 +104,7 @@ class AdaptiveStrategySpec extends WordSpec with ActorSpec with Matchers {
         val key = AdaptiveStrategy.Key(address1, shard)
         val counter = countersMap.getOrElse(key, BigInt(0))
         countersMap.put(key, counter + weight)
+        ()
       }
 
       def get(shard: Shard, addresses: Set[Address]): Map[Address, BigInt] = {

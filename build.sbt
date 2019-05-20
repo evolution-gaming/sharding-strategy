@@ -1,3 +1,5 @@
+import Dependencies._
+
 name := "sharding-strategy"
 
 organization := "com.evolutiongaming"
@@ -12,32 +14,25 @@ organizationHomepage := Some(url("http://evolutiongaming.com"))
 
 bintrayOrganization := Some("evolutiongaming")
 
-scalaVersion := crossScalaVersions.value.last
+scalaVersion := crossScalaVersions.value.head
 
-crossScalaVersions := Seq("2.11.12", "2.12.6")
+crossScalaVersions := Seq("2.12.8")
 
-scalacOptions ++= Seq(
-  "-encoding", "UTF-8",
-  "-feature",
-  "-unchecked",
-  "-deprecation",
-  "-Xfatal-warnings",
-  "-Xlint",
-  "-Yno-adapted-args",
-  "-Ywarn-dead-code",
-  "-Ywarn-numeric-widen",
-  "-Xfuture")
-
-scalacOptions in (Compile,doc) ++= Seq("-groups", "-implicits", "-no-link-warnings")
+scalacOptions -= "-Ywarn-unused:params"
 
 resolvers += Resolver.bintrayRepo("evolutiongaming", "maven")
 
 libraryDependencies ++= Seq(
-  "com.evolutiongaming" %% "ddata-tools" % "1.0.0",
-  "com.typesafe.akka" %% "akka-cluster-sharding" % "2.5.14",
-  "com.typesafe.akka" %% "akka-testkit" % "2.5.14" % Test,
-  "com.evolutiongaming" %% "safe-actor" % "1.7",
-  "org.scalatest" %% "scalatest" % "3.0.5" % Test)
+  `ddata-tools`,
+  `safe-actor`,
+  Akka.actor,
+  Akka.`distributed-data`,
+  Akka.cluster,
+  Akka.sharding,
+  Akka.testkit % Test,
+  Cats.core,
+  Cats.effect,
+  scalatest % Test)
 
 licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))
 

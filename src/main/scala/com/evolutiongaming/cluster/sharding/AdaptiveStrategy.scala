@@ -1,7 +1,6 @@
 package com.evolutiongaming.cluster.sharding
 
 import akka.actor._
-import akka.cluster.Cluster
 import akka.cluster.ddata.Replicator.WriteLocal
 import akka.cluster.ddata._
 import akka.cluster.sharding.ShardRegion
@@ -184,14 +183,14 @@ object AdaptiveStrategy {
 
   object Counters {
     def apply(typeName: String, replicatorRef: ActorRef)(implicit system: ActorSystem): Counters = {
-      implicit val cluster = Cluster(system)
       implicit val ec = system.dispatcher
       implicit val consistency = WriteLocal
 
       val dataKey = PNCounterMapKey[Key](s"AdaptiveStrategy-$typeName")
       val replicator = SafeReplicator(dataKey, 30.seconds, replicatorRef)
       val log = ActorLog(system, AdaptiveStrategy.getClass) prefixed typeName
-      val address = cluster.selfAddress
+      val selfUniqueAddress = DistributedData(system).selfUniqueAddress
+      val address = selfUniqueAddress.uniqueAddress.address
       var counters = Map.empty[Key, BigInt]
       replicator.subscribe() { value => counters = value.entries }
 
@@ -212,7 +211,7 @@ object AdaptiveStrategy {
         def increase(shard: Shard, weight: Weight): Unit = {
           val key = Key(address, shard)
           update(s"incremented $shard by $weight", s"failed to increment $shard by $weight") { data =>
-            data.increment(key, weight.toLong)
+            data.increment(selfUniqueAddress, key, weight.toLong)
           }
         }
 
@@ -221,7 +220,7 @@ object AdaptiveStrategy {
             addresses.foldLeft(data) { case (data, address) =>
               val key = Key(address, shard)
               val value = data.get(key)
-              value.fold(data) { value => data.decrement(key, value.toLong) }
+              value.fold(data) { value => data.decrement(selfUniqueAddress, key, value.toLong) }
             }
           }
         }
