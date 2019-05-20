@@ -1,27 +1,27 @@
 package com.evolutiongaming.cluster.sharding
 
 
-import akka.actor.{ActorRef, ActorSystem, Address, ExtendedActorSystem, Extension, ExtensionId}
-import akka.cluster.ddata.Replicator.{ReadLocal, WriteLocal}
+import akka.actor.{ActorRef, ActorRefFactory, ActorSystem, Address, ExtendedActorSystem, Extension, ExtensionId}
+import akka.cluster.ddata.Replicator.{ReadConsistency, ReadLocal, WriteConsistency, WriteLocal}
 import akka.cluster.ddata._
 import cats.implicits._
 import com.evolutiongaming.cluster.ddata.SafeReplicator
 import com.evolutiongaming.cluster.ddata.SafeReplicator.{GetFailure, UpdateFailure}
 import com.evolutiongaming.safeakka.actor.ActorLog
 
-import scala.collection.concurrent.TrieMap
-import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 
 
 object MappedStrategy {
 
-  def apply(typeName: String)(implicit system: ActorSystem): ShardingStrategy = {
-    val mapping = MappingExtension(system)(typeName)
-    apply(mapping, AddressOf(system))
+  def apply(typeName: String)(implicit actorSystem: ActorSystem): ShardingStrategy = {
+    val ext = Ext(actorSystem)
+    val mapping = Mapping(typeName, ext.replicatorRef)
+    apply(mapping, AddressOf(actorSystem))
   }
 
-  def apply(mapping: MappedStrategy.Mapping, addressOf: AddressOf): ShardingStrategy = {
+  def apply(mapping: Mapping, addressOf: AddressOf): ShardingStrategy = {
 
     def regionByAddress(address: Address, current: Allocation) = {
       current.keys find { region => addressOf(region) == address }
@@ -50,21 +50,36 @@ object MappedStrategy {
     }
   }
 
+
   trait Mapping {
+
     def get(shard: Shard): Option[Address]
+
     def set(shard: Shard, address: Address): Unit
   }
 
   object Mapping {
+
     def apply(typeName: String, replicatorRef: ActorRef)(implicit system: ActorSystem): Mapping = {
-      implicit val ec = system.dispatcher
+      implicit val executor = system.dispatcher
       implicit val writeConsistency = WriteLocal
       implicit val readConsistency = ReadLocal
       val selfUniqueAddress = DistributedData(system).selfUniqueAddress
-
       val dataKey = LWWMapKey[Shard, Address](s"MappedStrategy-$typeName")
-      val replicator = SafeReplicator(dataKey, 30.seconds, replicatorRef)
+      val replicator = SafeReplicator(dataKey, 1.minute, replicatorRef)
       val log = ActorLog(system, MappedStrategy.getClass) prefixed typeName
+      apply(replicator, selfUniqueAddress, log)
+    }
+
+    def apply(
+      replicator: SafeReplicator[LWWMap[Shard, Address]],
+      selfUniqueAddress: SelfUniqueAddress,
+      log: ActorLog)(implicit
+      writeConsistency: WriteConsistency,
+      readConsistency: ReadConsistency,
+      executor: ExecutionContext,
+      refFactory: ActorRefFactory
+    ): Mapping = {
 
       var cache = Map.empty[Shard, Address]
       replicator.subscribe() { data => cache = data.entries }
@@ -127,22 +142,23 @@ object MappedStrategy {
     }
   }
 
-  class MappingExtension(implicit system: ActorSystem) extends Extension {
 
-    private lazy val replicatorRef = {
-      val settings = ReplicatorSettings(system)
-      val props = Replicator.props(settings)
-      system.actorOf(props, "mappedStrategyReplicator")
-    }
+  trait Ext extends Extension {
 
-    private val cache = TrieMap.empty[String, Mapping]
-
-    def apply(typeName: String): Mapping = {
-      cache.getOrElseUpdate(typeName, Mapping(typeName, replicatorRef))
-    }
+    def replicatorRef: ActorRef
   }
 
-  object MappingExtension extends ExtensionId[MappingExtension] {
-    def createExtension(system: ExtendedActorSystem): MappingExtension = new MappingExtension()(system)
+  object Ext extends ExtensionId[Ext] {
+
+    def createExtension(system: ExtendedActorSystem): Ext = {
+
+      new Ext {
+        val replicatorRef = {
+          val settings = ReplicatorSettings(system)
+          val props = Replicator.props(settings)
+          system.actorOf(props, "mappedStrategyReplicator")
+        }
+      }
+    }
   }
 }

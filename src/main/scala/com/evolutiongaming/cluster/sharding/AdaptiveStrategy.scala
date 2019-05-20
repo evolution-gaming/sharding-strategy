@@ -1,15 +1,17 @@
 package com.evolutiongaming.cluster.sharding
 
 import akka.actor._
-import akka.cluster.ddata.Replicator.WriteLocal
+import akka.cluster.ddata.Replicator.{WriteConsistency, WriteLocal}
 import akka.cluster.ddata._
 import akka.cluster.sharding.ShardRegion
 import akka.cluster.sharding.ShardRegion.ExtractShardId
 import com.evolutiongaming.cluster.ddata.SafeReplicator
 import com.evolutiongaming.cluster.ddata.SafeReplicator.UpdateFailure
+import com.evolutiongaming.cluster.sharding.AdaptiveStrategy.Counters
 import com.evolutiongaming.safeakka.actor.ActorLog
 
 import scala.collection.concurrent.TrieMap
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 /**
@@ -27,11 +29,11 @@ object AdaptiveStrategy {
     lazy val Increment: MsgWeight = _ => 1
   }
 
-  
+
   def apply(
     rebalanceThresholdPercent: Int,
     addressOf: AddressOf,
-    counters: AdaptiveStrategy.Counters
+    counters: Counters
   ): ShardingStrategy = {
 
     def toAddresses(current: Allocation) = current.keySet map addressOf.apply
@@ -151,22 +153,6 @@ object AdaptiveStrategy {
   }
 
 
-  def apply(
-    typeName: String,
-    rebalanceThresholdPercent: Int,
-    addressOf: AddressOf)(implicit
-    system: ActorSystem
-  ): ShardingStrategy = {
-
-    val counters = CountersExtension(system)(typeName)
-
-    AdaptiveStrategy(
-      rebalanceThresholdPercent = rebalanceThresholdPercent,
-      addressOf = addressOf,
-      counters = counters)
-  }
-
-
   def extractShardId(
     counters: Counters,
     extractShardId: ExtractShardId,
@@ -192,14 +178,26 @@ object AdaptiveStrategy {
   }
 
   object Counters {
-    def apply(typeName: String, replicatorRef: ActorRef)(implicit system: ActorSystem): Counters = {
-      implicit val ec = system.dispatcher
-      implicit val consistency = WriteLocal
 
+    def apply(typeName: String, replicatorRef: ActorRef)(implicit system: ActorSystem): Counters = {
+      implicit val consistency = WriteLocal
+      implicit val executor = system.dispatcher
       val dataKey = PNCounterMapKey[Key](s"AdaptiveStrategy-$typeName")
-      val replicator = SafeReplicator(dataKey, 30.seconds, replicatorRef)
+      val replicator = SafeReplicator(dataKey, 1.minute, replicatorRef)
       val log = ActorLog(system, AdaptiveStrategy.getClass) prefixed typeName
       val selfUniqueAddress = DistributedData(system).selfUniqueAddress
+      apply(replicator, log, selfUniqueAddress)
+    }
+
+    def apply(
+      replicator: SafeReplicator[PNCounterMap[Key]],
+      log: ActorLog,
+      selfUniqueAddress: SelfUniqueAddress)(implicit
+      consistency: WriteConsistency,
+      executor: ExecutionContext,
+      refFactory: ActorRefFactory
+    ): Counters = {
+      
       val address = selfUniqueAddress.uniqueAddress.address
       var counters = Map.empty[Key, BigInt]
       replicator.subscribe() { value => counters = value.entries }
@@ -227,7 +225,7 @@ object AdaptiveStrategy {
 
         def reset(shard: Shard, addresses: Set[Address]): Unit = {
           update(s"reset $shard", s"failed to reset $shard") { data =>
-            addresses.foldLeft(data) { case (data, address) =>
+            addresses.foldLeft(data) { (data, address) =>
               val key = Key(address, shard)
               val value = data.get(key)
               value.fold(data) { value => data.decrement(selfUniqueAddress, key, value.toLong) }
@@ -248,23 +246,23 @@ object AdaptiveStrategy {
   }
 
 
-  class CountersExtension(implicit system: ActorSystem) extends Extension {
+  trait Ext extends Extension {
 
-    private lazy val replicatorRef = {
-      val settings = ReplicatorSettings(system)
-      val props = Replicator.props(settings)
-      system.actorOf(props, "adaptiveStrategyReplicator")
-    }
-
-    private val cache = TrieMap.empty[String, Counters]
-
-    def apply(typeName: String): Counters = {
-      cache.getOrElseUpdate(typeName, Counters(typeName, replicatorRef))
-    }
+    def replicatorRef: ActorRef
   }
 
-  object CountersExtension extends ExtensionId[CountersExtension] {
-    def createExtension(system: ExtendedActorSystem): CountersExtension = new CountersExtension()(system)
+  object Ext extends ExtensionId[Ext] {
+
+    def createExtension(system: ExtendedActorSystem) = {
+
+      new Ext {
+        val replicatorRef = {
+          val settings = ReplicatorSettings(system)
+          val props = Replicator.props(settings)
+          system.actorOf(props, "adaptiveStrategyReplicator")
+        }
+      }
+    }
   }
 
   final case class Key(address: Address, shard: Shard)
@@ -281,7 +279,8 @@ object AdaptiveStrategyAndExtractShardId {
     system: ActorSystem
   ): (ShardingStrategy, ExtractShardId) = {
 
-    val counters = AdaptiveStrategy.CountersExtension(system)(typeName)
+    val ext = AdaptiveStrategy.Ext(system)
+    val counters = Counters(typeName, ext.replicatorRef)
     val adaptiveExtractShardId = AdaptiveStrategy.extractShardId(counters, extractShardId, msgWeight)
     val adaptiveStrategy = AdaptiveStrategy(
       rebalanceThresholdPercent = rebalanceThresholdPercent,
