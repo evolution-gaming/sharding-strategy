@@ -1,10 +1,13 @@
 package com.evolutiongaming.cluster.sharding
 
-object RebalanceAllStrategy extends ShardingStrategy {
+object RebalanceAllStrategy {
 
-  def allocate(requester: Region, shard: Shard, current: Allocation) = None
+  def apply(): ShardingStrategy = new ShardingStrategy {
 
-  def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-    current.values.flatten.toList
+    def allocate(requester: Region, shard: Shard, current: Allocation) = None
+
+    def rebalance(current: Allocation, inProgress: Set[Shard]) = {
+      current.values.flatten.toList
+    }
   }
 }

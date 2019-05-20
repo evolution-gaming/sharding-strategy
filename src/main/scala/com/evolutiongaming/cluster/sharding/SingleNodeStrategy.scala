@@ -2,29 +2,35 @@ package com.evolutiongaming.cluster.sharding
 
 import akka.actor.Address
 
-class SingleNodeStrategy(address: => Option[Address], toAddress: Region => Address) extends ShardingStrategy {
+object SingleNodeStrategy {
 
-  def allocate(requester: Region, shard: Shard, current: Allocation) = {
-    for {
-      address <- address
-      region <- regionByAddress(address, current)
-    } yield region
-  }
+  def apply(address: => Option[Address], toAddress: Region => Address): ShardingStrategy = {
 
-  def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-    val shards = for {
-      address <- address.toIterable
-      (region, shards) <- current
-      if shards.nonEmpty
-      if toAddress(region) != address
-      if regionByAddress(address, current).isDefined
-      shard <- shards
-    } yield shard
+    new ShardingStrategy {
 
-    shards.toList.sorted
-  }
+      def allocate(requester: Region, shard: Shard, current: Allocation) = {
+        for {
+          address <- address
+          region <- regionByAddress(address, current)
+        } yield region
+      }
 
-  private def regionByAddress(address: Address, current: Allocation) = {
-    current.keys find { region => toAddress(region) == address }
+      def rebalance(current: Allocation, inProgress: Set[Shard]) = {
+        val shards = for {
+          address <- address.toIterable
+          (region, shards) <- current
+          if shards.nonEmpty
+          if toAddress(region) != address
+          if regionByAddress(address, current).isDefined
+          shard <- shards
+        } yield shard
+
+        shards.toList.sorted
+      }
+
+      private def regionByAddress(address: Address, current: Allocation) = {
+        current.keys find { region => toAddress(region) == address }
+      }
+    }
   }
 }

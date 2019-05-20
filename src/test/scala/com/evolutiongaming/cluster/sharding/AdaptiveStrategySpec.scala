@@ -123,7 +123,7 @@ class AdaptiveStrategySpec extends WordSpec with ActorSpec with Matchers {
       }
     }
 
-    val strategy = new AdaptiveStrategy(10, toAddress, counters)
+    val strategy = AdaptiveStrategy(10, toAddress, counters)
   }
 
   def newRegion() = {

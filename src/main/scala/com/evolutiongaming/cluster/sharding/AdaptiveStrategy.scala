@@ -16,123 +16,6 @@ import scala.concurrent.duration._
   * Entity related messages from clients counted and an entity shard reallocated to a node
   * which receives most of client messages for the corresponding entity
   */
-class AdaptiveStrategy(
-  rebalanceThresholdPercent: Int,
-  toAddress: Region => Address,
-  counters: AdaptiveStrategy.Counters) extends ShardingStrategy {
-
-  private val toRebalance = TrieMap.empty[Shard, Address]
-
-  def allocate(requester: Region, shard: Shard, current: Allocation) = {
-    val addresses = toAddresses(current)
-
-    val address = toRebalance.get(shard) filter addresses.contains orElse {
-
-      val zero = (BigInt(0), List.empty[Address])
-      val counters = {
-        val counters = this.counters.get(shard, addresses)
-        fix(counters, None)
-      }
-
-      val (_, maxAddresses) = counters.foldLeft(zero) { case ((max, maxAddresses), (address, counter)) =>
-        if (counter > max) (counter, address :: Nil)
-        else if (counter == max) (counter, address :: maxAddresses)
-        else (max, maxAddresses)
-      }
-      if (current.size == maxAddresses.size) None
-      else {
-        val requesterAddress = toAddress(requester)
-        if (maxAddresses contains requesterAddress) Some(requesterAddress)
-        else maxAddresses.headOption
-      }
-    }
-
-    val region = for {
-      address <- address
-      region <- current.keys find { region => toAddress(region) == address }
-    } yield region
-
-
-    if (region.isDefined) {
-      counters.reset(shard, addresses)
-      toRebalance.remove(shard)
-    }
-    region
-  }
-
-  def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-    val addresses = toAddresses(current)
-
-    def rebalance(shard: Shard, home: Address) = {
-      val counters = {
-        val counters = this.counters.get(shard, addresses)
-        fix(counters, Some(home))
-      }
-
-      val sum = counters.foldLeft(BigInt(0)) { case (sum, (_, counter)) => sum + counter }
-      if (sum == 0) None
-      else {
-        val ratios = {
-          val multiplier = 100.0 / sum.toDouble
-          counters map { case (address, counter) =>
-            val ratio = multiplier * counter.toDouble
-            (address, ratio)
-          }
-        }
-        val homeRatio = ratios.collectFirst { case (`home`, value) => value.toDouble } getOrElse 0.0
-        val (maxAddress, maxRatio) = ratios.maxBy { case (_, value) => value.toDouble }
-
-        if (maxAddress != home && maxRatio > (homeRatio + rebalanceThresholdPercent)) {
-          Some(maxAddress)
-        } else {
-          None
-        }
-      }
-    }
-
-    val result = for {
-      (region, shards) <- current
-      address = toAddress(region)
-      shard <- shards
-      address <- rebalance(shard, address)
-    } yield {
-      toRebalance.put(shard, address)
-      shard
-    }
-
-    result.toList.sorted
-  }
-
-  private def toAddresses(current: Allocation) = current.keySet map toAddress
-
-  // access from a non-home node is counted twice - on the non-home node and on the home node
-  // so, to get correct value for the home counter we need to deduct the sum of other non-home counters from it
-  private def fix(counters: Map[Address, BigInt], home: Option[Address]): Map[Address, BigInt] = {
-
-    def fix(home: Address, counter: BigInt) = {
-      val nonHomeSum = counters.foldLeft(BigInt(0)) { case (sum, (address, counter)) =>
-        if (address == home) sum
-        else sum + counter
-      }
-
-      if (counter <= nonHomeSum) counters
-      else {
-        val fixed = counter - nonHomeSum
-        counters + (home -> fixed)
-      }
-    }
-
-    home match {
-      case Some(home) => counters get home map { counter => fix(home, counter) } getOrElse counters
-      case None       =>
-        if (counters.isEmpty) counters
-        else {
-          val (homeGuess, counter) = counters maxBy { case (_, counter) => counter }
-          fix(homeGuess, counter)
-        }
-    }
-  }
-}
 
 object AdaptiveStrategy {
 
@@ -144,16 +27,140 @@ object AdaptiveStrategy {
     lazy val Increment: MsgWeight = _ => 1
   }
 
+  
+  def apply(
+    rebalanceThresholdPercent: Int,
+    toAddress: Region => Address,
+    counters: AdaptiveStrategy.Counters
+  ): ShardingStrategy = {
+
+    def toAddresses(current: Allocation) = current.keySet map toAddress
+
+    // access from a non-home node is counted twice - on the non-home node and on the home node
+    // so, to get correct value for the home counter we need to deduct the sum of other non-home counters from it
+    def fix(counters: Map[Address, BigInt], home: Option[Address]): Map[Address, BigInt] = {
+
+      def fix(home: Address, counter: BigInt) = {
+        val nonHomeSum = counters.foldLeft(BigInt(0)) { case (sum, (address, counter)) =>
+          if (address == home) sum
+          else sum + counter
+        }
+
+        if (counter <= nonHomeSum) counters
+        else {
+          val fixed = counter - nonHomeSum
+          counters + (home -> fixed)
+        }
+      }
+
+      home match {
+        case Some(home) => counters get home map { counter => fix(home, counter) } getOrElse counters
+        case None       =>
+          if (counters.isEmpty) counters
+          else {
+            val (homeGuess, counter) = counters maxBy { case (_, counter) => counter }
+            fix(homeGuess, counter)
+          }
+      }
+    }
+
+    new ShardingStrategy {
+
+      private val toRebalance = TrieMap.empty[Shard, Address]
+
+      def allocate(requester: Region, shard: Shard, current: Allocation) = {
+        val addresses = toAddresses(current)
+
+        val address = toRebalance.get(shard) filter addresses.contains orElse {
+
+          val zero = (BigInt(0), List.empty[Address])
+          val counters1 = {
+            val counters1 = counters.get(shard, addresses)
+            fix(counters1, None)
+          }
+
+          val (_, maxAddresses) = counters1.foldLeft(zero) { case ((max, maxAddresses), (address, counter)) =>
+            if (counter > max) (counter, address :: Nil)
+            else if (counter == max) (counter, address :: maxAddresses)
+            else (max, maxAddresses)
+          }
+          if (current.size == maxAddresses.size) None
+          else {
+            val requesterAddress = toAddress(requester)
+            if (maxAddresses contains requesterAddress) Some(requesterAddress)
+            else maxAddresses.headOption
+          }
+        }
+
+        val region = for {
+          address <- address
+          region <- current.keys find { region => toAddress(region) == address }
+        } yield region
+
+
+        if (region.isDefined) {
+          counters.reset(shard, addresses)
+          toRebalance.remove(shard)
+        }
+        region
+      }
+
+      def rebalance(current: Allocation, inProgress: Set[Shard]) = {
+        val addresses = toAddresses(current)
+
+        def rebalance(shard: Shard, home: Address) = {
+          val counters1 = {
+            val counters1 = counters.get(shard, addresses)
+            fix(counters1, Some(home))
+          }
+
+          val sum = counters1.foldLeft(BigInt(0)) { case (sum, (_, counter)) => sum + counter }
+          if (sum == 0) None
+          else {
+            val ratios = {
+              val multiplier = 100.0 / sum.toDouble
+              counters1 map { case (address, counter) =>
+                val ratio = multiplier * counter.toDouble
+                (address, ratio)
+              }
+            }
+            val homeRatio = ratios.collectFirst { case (`home`, value) => value.toDouble } getOrElse 0.0
+            val (maxAddress, maxRatio) = ratios.maxBy { case (_, value) => value.toDouble }
+
+            if (maxAddress != home && maxRatio > (homeRatio + rebalanceThresholdPercent)) {
+              Some(maxAddress)
+            } else {
+              None
+            }
+          }
+        }
+
+        val result = for {
+          (region, shards) <- current
+          address = toAddress(region)
+          shard <- shards
+          address <- rebalance(shard, address)
+        } yield {
+          toRebalance.put(shard, address)
+          shard
+        }
+
+        result.toList.sorted
+      }
+    }
+  }
+
 
   def apply(
     typeName: String,
     rebalanceThresholdPercent: Int,
-    toAddress: Region => Address)
-    (implicit system: ActorSystem): AdaptiveStrategy = {
+    toAddress: Region => Address)(implicit
+    system: ActorSystem
+  ): ShardingStrategy = {
 
     val counters = CountersExtension(system)(typeName)
 
-    new AdaptiveStrategy(
+    AdaptiveStrategy(
       rebalanceThresholdPercent = rebalanceThresholdPercent,
       toAddress = toAddress,
       counters = counters)
@@ -267,13 +274,14 @@ object AdaptiveStrategyAndExtractShardId {
     typeName: String,
     rebalanceThresholdPercent: Int,
     msgWeight: AdaptiveStrategy.MsgWeight,
-    extractShardId: ExtractShardId)
-    (implicit system: ActorSystem): (AdaptiveStrategy, ExtractShardId) = {
+    extractShardId: ExtractShardId)(implicit
+    system: ActorSystem
+  ): (ShardingStrategy, ExtractShardId) = {
 
     val counters = AdaptiveStrategy.CountersExtension(system)(typeName)
     val absoluteAddress = AbsoluteAddress(system)
     val adaptiveExtractShardId = AdaptiveStrategy.extractShardId(counters, extractShardId, msgWeight)
-    val adaptiveStrategy = new AdaptiveStrategy(
+    val adaptiveStrategy = AdaptiveStrategy(
       rebalanceThresholdPercent = rebalanceThresholdPercent,
       counters = counters,
       toAddress = region => absoluteAddress(region.path.address))

@@ -3,7 +3,8 @@ package com.evolutiongaming.cluster.sharding
 
 import akka.actor.{ActorRef, ActorSystem, Address, ExtendedActorSystem, Extension, ExtensionId}
 import akka.cluster.ddata.Replicator.{ReadLocal, WriteLocal}
-import akka.cluster.ddata.{DistributedData, LWWMap, LWWMapKey, Replicator, ReplicatorSettings}
+import akka.cluster.ddata._
+import cats.implicits._
 import com.evolutiongaming.cluster.ddata.SafeReplicator
 import com.evolutiongaming.cluster.ddata.SafeReplicator.{GetFailure, UpdateFailure}
 import com.evolutiongaming.safeakka.actor.ActorLog
@@ -12,45 +13,42 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class MappedStrategy private(
-  mapping: MappedStrategy.Mapping,
-  toAddress: Region => Address) extends ShardingStrategy {
-
-  def allocate(requester: Region, shard: Shard, current: Allocation) = {
-    for {
-      address <- mapping get shard
-      region <- regionByAddress(address, current)
-    } yield region
-  }
-
-  def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-
-    val toRebalance = for {
-      (region, shards) <- current
-      shard <- shards
-      address <- mapping get shard
-      if toAddress(region) != address && regionByAddress(address, current).isDefined
-    } yield shard
-
-    toRebalance.toList.sorted
-  }
-
-  private def regionByAddress(address: Address, current: Allocation) = {
-    current.keys find { region => toAddress(region) == address }
-  }
-}
 
 object MappedStrategy {
 
   def apply(typeName: String)
-    (implicit system: ActorSystem): MappedStrategy = {
+    (implicit system: ActorSystem): ShardingStrategy = {
     val mapping = MappingExtension(system)(typeName)
     val absoluteAddress = AbsoluteAddress(system)
     apply(mapping, (region: Region) => absoluteAddress(region.path.address))
   }
 
-  def apply(mapping: MappedStrategy.Mapping, toAddress: Region => Address): MappedStrategy = {
-    new MappedStrategy(mapping, toAddress)
+  def apply(mapping: MappedStrategy.Mapping, toAddress: Region => Address): ShardingStrategy = {
+    new ShardingStrategy {
+
+      def allocate(requester: Region, shard: Shard, current: Allocation) = {
+        for {
+          address <- mapping get shard
+          region  <- regionByAddress(address, current)
+        } yield region
+      }
+
+      def rebalance(current: Allocation, inProgress: Set[Shard]) = {
+
+        val toRebalance = for {
+          (region, shards) <- current
+          shard            <- shards
+          address          <- mapping get shard
+          if toAddress(region) != address && regionByAddress(address, current).isDefined
+        } yield shard
+
+        toRebalance.toList.sorted
+      }
+
+      private def regionByAddress(address: Address, current: Allocation) = {
+        current.keys find { region => toAddress(region) == address }
+      }
+    }
   }
 
   trait Mapping {
@@ -147,10 +145,5 @@ object MappedStrategy {
 
   object MappingExtension extends ExtensionId[MappingExtension] {
     def createExtension(system: ExtendedActorSystem): MappingExtension = new MappingExtension()(system)
-  }
-
-  private implicit class EitherOps[A](val self: A) extends AnyVal {
-    def asLeft[B]: Either[A, B] = Left(self)
-    def asRight[B]: Either[B, A] = Right(self)
   }
 }
