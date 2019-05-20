@@ -4,7 +4,11 @@ import akka.actor.Address
 
 object SingleNodeStrategy {
 
-  def apply(address: => Option[Address], toAddress: Region => Address): ShardingStrategy = {
+  def apply(address: => Option[Address], addressOf: AddressOf): ShardingStrategy = {
+
+    def regionByAddress(address: Address, current: Allocation) = {
+      current.keys find { region => addressOf(region) == address }
+    }
 
     new ShardingStrategy {
 
@@ -20,16 +24,12 @@ object SingleNodeStrategy {
           address <- address.toIterable
           (region, shards) <- current
           if shards.nonEmpty
-          if toAddress(region) != address
+          if addressOf(region) != address
           if regionByAddress(address, current).isDefined
           shard <- shards
         } yield shard
 
         shards.toList.sorted
-      }
-
-      private def regionByAddress(address: Address, current: Allocation) = {
-        current.keys find { region => toAddress(region) == address }
       }
     }
   }

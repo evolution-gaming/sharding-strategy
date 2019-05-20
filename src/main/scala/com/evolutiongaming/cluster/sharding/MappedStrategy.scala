@@ -16,14 +16,17 @@ import scala.concurrent.duration._
 
 object MappedStrategy {
 
-  def apply(typeName: String)
-    (implicit system: ActorSystem): ShardingStrategy = {
+  def apply(typeName: String)(implicit system: ActorSystem): ShardingStrategy = {
     val mapping = MappingExtension(system)(typeName)
-    val absoluteAddress = AbsoluteAddress(system)
-    apply(mapping, (region: Region) => absoluteAddress(region.path.address))
+    apply(mapping, AddressOf(system))
   }
 
-  def apply(mapping: MappedStrategy.Mapping, toAddress: Region => Address): ShardingStrategy = {
+  def apply(mapping: MappedStrategy.Mapping, addressOf: AddressOf): ShardingStrategy = {
+
+    def regionByAddress(address: Address, current: Allocation) = {
+      current.keys find { region => addressOf(region) == address }
+    }
+
     new ShardingStrategy {
 
       def allocate(requester: Region, shard: Shard, current: Allocation) = {
@@ -39,14 +42,10 @@ object MappedStrategy {
           (region, shards) <- current
           shard            <- shards
           address          <- mapping get shard
-          if toAddress(region) != address && regionByAddress(address, current).isDefined
+          if addressOf(region) != address && regionByAddress(address, current).isDefined
         } yield shard
 
         toRebalance.toList.sorted
-      }
-
-      private def regionByAddress(address: Address, current: Allocation) = {
-        current.keys find { region => toAddress(region) == address }
       }
     }
   }

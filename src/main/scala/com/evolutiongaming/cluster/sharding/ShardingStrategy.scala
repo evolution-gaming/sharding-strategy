@@ -146,6 +146,26 @@ object ShardingStrategy {
       toGlobal: Address => Address
     ): ShardingStrategy = {
 
+      def allocationToStr(current: Allocation) = {
+        current map { case (region, shards) =>
+          val regionStr = regionToStr(region)
+          val shardsStr = iterToStr(shards)
+          val size = shards.size
+          s"$regionStr($size): $shardsStr"
+        } mkString ", "
+      }
+
+      def iterToStr(iter: Iterable[_]) = {
+        iter.toSeq.map { _.toString }.sorted.mkString("[", ",", "]")
+      }
+
+      def regionToStr(region: Region) = {
+        val address = toGlobal(region.path.address)
+        val host = address.host.fold("none") { _.toString }
+        val port = address.port.fold("none") { _.toString }
+        s"$host:$port"
+      }
+
       new ShardingStrategy {
         def allocate(requester: Region, shard: Shard, current: Allocation) = {
           val region = strategy.allocate(requester, shard, current)
@@ -168,26 +188,6 @@ object ShardingStrategy {
             log(() => msg)
           }
           shards
-        }
-
-        private def allocationToStr(current: Allocation) = {
-          current map { case (region, shards) =>
-            val regionStr = regionToStr(region)
-            val shardsStr = iterToStr(shards)
-            val size = shards.size
-            s"$regionStr($size): $shardsStr"
-          } mkString ", "
-        }
-
-        private def iterToStr(iter: Iterable[_]) = {
-          iter.toSeq.map { _.toString }.sorted.mkString("[", ",", "]")
-        }
-
-        private def regionToStr(region: Region) = {
-          val address = toGlobal(region.path.address)
-          val host = address.host.fold("none") { _.toString }
-          val port = address.port.fold("none") { _.toString }
-          s"$host:$port"
         }
       }
     }

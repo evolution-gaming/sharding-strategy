@@ -149,10 +149,15 @@ class AdaptiveStrategySpec extends WordSpec with ActorSpec with Matchers {
   val shard2 = "shard2"
   val shard3 = "shard3"
 
-  val toAddress = Map(
-    region1 -> address1,
-    region2 -> address2,
-    region3 -> address3)
+  val toAddress = {
+    val addresses = Map(
+      region1 -> address1,
+      region2 -> address2,
+      region3 -> address3)
+    new AddressOf {
+      def apply(region: Region) = addresses(region)
+    }
+  }
 
   val allocation = Map(
     region1 -> IndexedSeq(shard1),

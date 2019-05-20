@@ -30,11 +30,11 @@ object AdaptiveStrategy {
   
   def apply(
     rebalanceThresholdPercent: Int,
-    toAddress: Region => Address,
+    addressOf: AddressOf,
     counters: AdaptiveStrategy.Counters
   ): ShardingStrategy = {
 
-    def toAddresses(current: Allocation) = current.keySet map toAddress
+    def toAddresses(current: Allocation) = current.keySet map addressOf.apply
 
     // access from a non-home node is counted twice - on the non-home node and on the home node
     // so, to get correct value for the home counter we need to deduct the sum of other non-home counters from it
@@ -64,9 +64,9 @@ object AdaptiveStrategy {
       }
     }
 
-    new ShardingStrategy {
+    val toRebalance = TrieMap.empty[Shard, Address]
 
-      private val toRebalance = TrieMap.empty[Shard, Address]
+    new ShardingStrategy {
 
       def allocate(requester: Region, shard: Shard, current: Allocation) = {
         val addresses = toAddresses(current)
@@ -86,7 +86,7 @@ object AdaptiveStrategy {
           }
           if (current.size == maxAddresses.size) None
           else {
-            val requesterAddress = toAddress(requester)
+            val requesterAddress = addressOf(requester)
             if (maxAddresses contains requesterAddress) Some(requesterAddress)
             else maxAddresses.headOption
           }
@@ -94,7 +94,7 @@ object AdaptiveStrategy {
 
         val region = for {
           address <- address
-          region <- current.keys find { region => toAddress(region) == address }
+          region <- current.keys find { region => addressOf(region) == address }
         } yield region
 
 
@@ -137,7 +137,7 @@ object AdaptiveStrategy {
 
         val result = for {
           (region, shards) <- current
-          address = toAddress(region)
+          address = addressOf(region)
           shard <- shards
           address <- rebalance(shard, address)
         } yield {
@@ -154,7 +154,7 @@ object AdaptiveStrategy {
   def apply(
     typeName: String,
     rebalanceThresholdPercent: Int,
-    toAddress: Region => Address)(implicit
+    addressOf: AddressOf)(implicit
     system: ActorSystem
   ): ShardingStrategy = {
 
@@ -162,7 +162,7 @@ object AdaptiveStrategy {
 
     AdaptiveStrategy(
       rebalanceThresholdPercent = rebalanceThresholdPercent,
-      toAddress = toAddress,
+      addressOf = addressOf,
       counters = counters)
   }
 
@@ -183,8 +183,11 @@ object AdaptiveStrategy {
 
 
   trait Counters {
+
     def increase(shard: Shard, weight: Weight): Unit
+
     def reset(shard: Shard, addresses: Set[Address]): Unit
+
     def get(shard: Shard, addresses: Set[Address]): Map[Address, BigInt]
   }
 
@@ -279,12 +282,11 @@ object AdaptiveStrategyAndExtractShardId {
   ): (ShardingStrategy, ExtractShardId) = {
 
     val counters = AdaptiveStrategy.CountersExtension(system)(typeName)
-    val absoluteAddress = AbsoluteAddress(system)
     val adaptiveExtractShardId = AdaptiveStrategy.extractShardId(counters, extractShardId, msgWeight)
     val adaptiveStrategy = AdaptiveStrategy(
       rebalanceThresholdPercent = rebalanceThresholdPercent,
       counters = counters,
-      toAddress = region => absoluteAddress(region.path.address))
+      addressOf = AddressOf(system))
     (adaptiveStrategy, adaptiveExtractShardId)
   }
 }
