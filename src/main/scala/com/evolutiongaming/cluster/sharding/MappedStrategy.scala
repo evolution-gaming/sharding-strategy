@@ -4,24 +4,38 @@ package com.evolutiongaming.cluster.sharding
 import akka.actor.{ActorRef, ActorRefFactory, ActorSystem, Address, ExtendedActorSystem, Extension, ExtensionId}
 import akka.cluster.ddata.Replicator.{ReadConsistency, ReadLocal, WriteConsistency, WriteLocal}
 import akka.cluster.ddata._
+import cats.effect.concurrent.Ref
+import cats.effect.{Resource, Sync}
 import cats.implicits._
+import cats.~>
+import com.evolutiongaming.catshelper.{FromFuture, ToFuture, ToTry}
 import com.evolutiongaming.cluster.ddata.SafeReplicator
-import com.evolutiongaming.cluster.ddata.SafeReplicator.{GetFailure, UpdateFailure}
-import com.evolutiongaming.safeakka.actor.ActorLog
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
+import scala.util.control.NoStackTrace
 
 
 object MappedStrategy {
 
-  def apply(typeName: String)(implicit actorSystem: ActorSystem): ShardingStrategy = {
-    val ext = Ext(actorSystem)
-    val mapping = Mapping(typeName, ext.replicatorRef)
-    apply(mapping, AddressOf(actorSystem))
+  def of[F[_] : Sync : FromFuture : ToFuture : ToTry](typeName: String)(implicit actorSystem: ActorSystem): Resource[F, ShardingStrategy] = {
+    val ext = Sync[F].delay { Ext(actorSystem) }
+    val addressOf = Sync[F].delay { AddressOf(actorSystem) }
+    for {
+      ext       <- Resource.liftF(ext)
+      addressOf <- Resource.liftF(addressOf)
+      mapping   <- Mapping.of[F](typeName, ext.replicatorRef)
+    } yield {
+      val toTry = new (F ~> Try) {
+        def apply[A](fa: F[A]) = ToTry[F].apply(fa) // TODO remove
+      }
+      val mappingTry = mapping.mapK(toTry)
+      apply(mappingTry, addressOf)
+    }
   }
 
-  def apply(mapping: Mapping, addressOf: AddressOf): ShardingStrategy = {
+  def apply(mapping: Mapping[Try]/*TODO*/, addressOf: AddressOf): ShardingStrategy = {
 
     def regionByAddress(address: Address, current: Allocation) = {
       current.keys find { region => addressOf(region) == address }
@@ -31,17 +45,16 @@ object MappedStrategy {
 
       def allocate(requester: Region, shard: Shard, current: Allocation) = {
         for {
-          address <- mapping get shard
+          address <- (mapping get shard).get
           region  <- regionByAddress(address, current)
         } yield region
       }
 
       def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-
         val toRebalance = for {
           (region, shards) <- current
           shard            <- shards
-          address          <- mapping get shard
+          address          <- (mapping get shard).get
           if addressOf(region) != address && regionByAddress(address, current).isDefined
         } yield shard
 
@@ -51,96 +64,116 @@ object MappedStrategy {
   }
 
 
-  trait Mapping {
+  trait Mapping[F[_]] {
 
-    def get(shard: Shard): Option[Address]
+    def get(shard: Shard): F[Option[Address]]
 
-    def set(shard: Shard, address: Address): Unit
+    def set(shard: Shard, address: Address): F[Unit]
   }
 
   object Mapping {
 
-    def apply(typeName: String, replicatorRef: ActorRef)(implicit system: ActorSystem): Mapping = {
-      implicit val executor = system.dispatcher
+    def of[F[_] : Sync : FromFuture : ToFuture](
+      typeName: String,
+      replicatorRef: ActorRef)(implicit
+      actorSystem: ActorSystem
+    ): Resource[F, Mapping[F]] = {
+
+      implicit val executor = actorSystem.dispatcher
       implicit val writeConsistency = WriteLocal
       implicit val readConsistency = ReadLocal
-      val selfUniqueAddress = DistributedData(system).selfUniqueAddress
+      val selfUniqueAddress = Sync[F].delay { DistributedData(actorSystem).selfUniqueAddress }
       val dataKey = LWWMapKey[Shard, Address](s"MappedStrategy-$typeName")
       val replicator = SafeReplicator(dataKey, 1.minute, replicatorRef)
-      val log = ActorLog(system, MappedStrategy.getClass) prefixed typeName
-      apply(replicator, selfUniqueAddress, log)
+
+      for {
+        selfUniqueAddress <- Resource.liftF(selfUniqueAddress)
+        result            <- of(replicator, selfUniqueAddress)
+      } yield result
     }
 
-    def apply(
-      replicator: SafeReplicator[LWWMap[Shard, Address]],
-      selfUniqueAddress: SelfUniqueAddress,
-      log: ActorLog)(implicit
+    def of[F[_]: Sync](
+      replicator: SafeReplicator[F, LWWMap[Shard, Address]],
+      selfUniqueAddress: SelfUniqueAddress)(implicit
       writeConsistency: WriteConsistency,
       readConsistency: ReadConsistency,
       executor: ExecutionContext,
       refFactory: ActorRefFactory
-    ): Mapping = {
+    ): Resource[F, Mapping[F]] = {
 
-      var cache = Map.empty[Shard, Address]
-      replicator.subscribe() { data => cache = data.entries }
+      val cache = Ref[F].of(Map.empty[Shard, Address])
 
-      new Mapping {
+      for {
+        cache     <- Resource.liftF(cache)
+        onChanged  = (data: LWWMap[Shard, Address]) => cache.set(data.entries)
+        _         <- replicator.subscribe(().pure[F], onChanged)
+      } yield {
+        new Mapping[F] {
 
-        def get(shard: Shard): Option[Address] = {
-          cache.get(shard)
-        }
-
-        def set(shard: Shard, address: Address): Unit = {
-          def onFailure = s"failed to map $shard to $address"
-
-          def mapped(map: Map[Shard, Address]) = map get shard contains address
-
-          type Failure = (String, Option[Throwable])
-
-          def empty = LWWMap.empty[Shard, Address]
-
-          def data: Future[Either[Failure, LWWMap[Shard, Address]]] = replicator.get map {
-            case Right(result)             => result.asRight
-            case Left(GetFailure.NotFound) => empty.asRight
-            case Left(result)              => (s"$onFailure: $result", Option.empty[Throwable]).asLeft
+          def get(shard: Shard) = {
+            for {
+              cache <- cache.get
+            } yield {
+              cache.get(shard)
+            }
           }
 
-          def update(data: LWWMap[Shard, Address]): Future[Either[Failure, Boolean]] = {
-            if (mapped(data.entries) && mapped(cache)) {
-              Future.successful(false.asRight)
-            } else {
-              val result = replicator.update { data => (data getOrElse empty).put(selfUniqueAddress, shard, address) }
-              result.map {
-                case Right(())                                   => true.asRight
-                case Left(UpdateFailure.Failure(message, cause)) => (s"$onFailure: $message $cause", Some(cause)).asLeft
-                case Left(result)                                => (s"$onFailure: $result", None).asLeft
+          def set(shard: Shard, address: Address) = {
+
+            def mapped(map: Map[Shard, Address]) = map get shard contains address
+
+            def empty = LWWMap.empty[Shard, Address]
+
+            def data = {
+              for {
+                result <- replicator.get
+              } yield {
+                result getOrElse empty
               }
             }
-          }
 
-          val result = for {
-            data <- data
-            result <- data match {
-              case Right(data)   => update(data)
-              case Left(failure) => Future.successful(failure.asLeft)
+            def update(data: LWWMap[Shard, Address], cache: Map[Shard, Address]) = {
+              if (mapped(data.entries) && mapped(cache)) {
+                false.pure[F]
+              } else {
+                replicator.update { data => (data getOrElse empty).put(selfUniqueAddress, shard, address) }.as(true)
+              }
             }
-          } yield result
 
-          result foreach {
-            case Right(updated)               => if (updated) {
-              replicator.flushChanges()
-              log.debug(s"mapped $shard to $address")
+            val result = for {
+              data    <- data
+              cache   <- cache.get
+              updated <- update(data, cache)
+               _      <- if (updated) replicator.flushChanges else ().pure[F]
+            } yield {}
+
+            result.handleErrorWith { error =>
+              MappingError(shard, address, s"failed to map $shard to $address: $error", error).raiseError[F, Unit]
             }
-            case Left((message, Some(cause))) => log.error(message, cause)
-            case Left((message, None))        => log.error(message)
-          }
-          result.failed foreach { failure =>
-            log.error(s"$onFailure: $failure", failure)
           }
         }
       }
     }
+
+
+    implicit class MappingOps[F[_]](val self: Mapping[F]) extends AnyVal {
+
+      def mapK[G[_]](f: F ~> G): Mapping[G] = new Mapping[G] {
+
+        def get(shard: Shard) = f(self.get(shard))
+
+        def set(shard: Shard, address: Address) = f(self.set(shard, address))
+      }
+    }
   }
+
+
+  final case class MappingError(
+    shard: Shard,
+    address: Address,
+    msg: String,
+    cause: Throwable
+  ) extends RuntimeException(msg, cause) with NoStackTrace
 
 
   trait Ext extends Extension {
@@ -150,14 +183,11 @@ object MappedStrategy {
 
   object Ext extends ExtensionId[Ext] {
 
-    def createExtension(system: ExtendedActorSystem): Ext = {
-
-      new Ext {
-        val replicatorRef = {
-          val settings = ReplicatorSettings(system)
-          val props = Replicator.props(settings)
-          system.actorOf(props, "mappedStrategyReplicator")
-        }
+    def createExtension(system: ExtendedActorSystem) = new Ext {
+      val replicatorRef = {
+        val settings = ReplicatorSettings(system)
+        val props = Replicator.props(settings)
+        system.actorOf(props, "mappedStrategyReplicator")
       }
     }
   }

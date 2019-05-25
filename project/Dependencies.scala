@@ -4,8 +4,8 @@ object Dependencies {
 
   val `executor-tools` = "com.evolutiongaming" %% "executor-tools" % "1.0.1"
   val scalatest        = "org.scalatest"       %% "scalatest"      % "3.0.7"
-  val `cats-helper`    = "com.evolutiongaming" %% "cats-helper"    % "0.0.6"
-  val `ddata-tools`    = "com.evolutiongaming" %% "ddata-tools"    % "1.0.1"
+  val `cats-helper`    = "com.evolutiongaming" %% "cats-helper"    % "0.0.8"
+  val `ddata-tools`    = "com.evolutiongaming" %% "ddata-tools"    % "2.0.0"
   val `safe-actor`     = "com.evolutiongaming" %% "safe-actor"     % "2.0.5"
 
   object Cats {
@@ -15,7 +15,7 @@ object Dependencies {
   }
 
   object Akka {
-    private val version = "2.5.22"
+    private val version = "2.5.23"
     val actor              = "com.typesafe.akka" %% "akka-actor"            % version
     val cluster            = "com.typesafe.akka" %% "akka-cluster"          % version
     val sharding           = "com.typesafe.akka" %% "akka-cluster-sharding" % version

@@ -6,6 +6,7 @@ import org.scalatest.{Matchers, WordSpec}
 
 import scala.collection.immutable.IndexedSeq
 import scala.collection.mutable
+import scala.util.{Success, Try}
 
 class AdaptiveStrategySpec extends WordSpec with ActorSpec with Matchers {
 
@@ -59,14 +60,14 @@ class AdaptiveStrategySpec extends WordSpec with ActorSpec with Matchers {
         countersMap.put(AdaptiveStrategy.Key(address3, shard1), 2)
 
         strategy.allocate(region1, shard1, allocation) shouldEqual None
-        counters.get(shard1, Set(address1)) shouldEqual Map(address1 -> BigInt(2))
+        counters.get(shard1, Set(address1)) shouldEqual Success(Map(address1 -> BigInt(2)))
       }
 
       "reset counters if allocated" in new Scope {
         counters.increase(shard1, 1)
 
         strategy.allocate(region2, shard1, allocation) shouldEqual Some(region1)
-        counters.get(shard1, Set(address1)) shouldEqual Map(address1 -> BigInt(0))
+        counters.get(shard1, Set(address1)) shouldEqual Success(Map(address1 -> BigInt(0)))
       }
     }
 
@@ -98,28 +99,30 @@ class AdaptiveStrategySpec extends WordSpec with ActorSpec with Matchers {
 
     val countersMap = mutable.Map.empty[AdaptiveStrategy.Key, BigInt]
 
-    val counters = new AdaptiveStrategy.Counters {
+    val counters = new AdaptiveStrategy.Counters[Try] {
 
-      def increase(shard: Shard, weight: Weight): Unit = {
+      def increase(shard: Shard, weight: Weight) = {
         val key = AdaptiveStrategy.Key(address1, shard)
         val counter = countersMap.getOrElse(key, BigInt(0))
         countersMap.put(key, counter + weight)
-        ()
+        Success(())
       }
 
-      def get(shard: Shard, addresses: Set[Address]): Map[Address, BigInt] = {
-        addresses.map { address =>
+      def get(shard: Shard, addresses: Set[Address]) = {
+        val result = addresses.map { address =>
           val key = AdaptiveStrategy.Key(address, shard)
           val counter = countersMap.getOrElse(key, BigInt(0))
           (address, counter)
         }.toMap
+        Success(result)
       }
 
-      def reset(shard: Shard, addresses: Set[Address]): Unit = {
-        addresses.foreach { address =>
+      def reset(shard: Shard, addresses: Set[Address]) = {
+        val result = addresses.foreach { address =>
           val key = AdaptiveStrategy.Key(address, shard)
           countersMap.remove(key)
         }
+        Success(result)
       }
     }
 
