@@ -12,4 +12,9 @@ object AddressOf {
     val absoluteAddress = AbsoluteAddress(actorSystem)
     region: Region => absoluteAddress(region.path.address)
   }
+
+
+  def const(address: Address): AddressOf = new AddressOf {
+    def apply(region: Region) = address
+  }
 }

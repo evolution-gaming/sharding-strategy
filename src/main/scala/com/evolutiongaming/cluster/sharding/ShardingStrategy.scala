@@ -2,41 +2,44 @@ package com.evolutiongaming.cluster.sharding
 
 import akka.actor.Address
 import akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy
+import cats.effect.concurrent.Ref
+import cats.effect.{Clock, Sync}
+import cats.implicits._
+import cats.{Applicative, FlatMap, Monad, ~>}
+import com.evolutiongaming.catshelper.ClockHelper._
+import com.evolutiongaming.catshelper.ToFuture
 
 import scala.collection.immutable.IndexedSeq
-import scala.collection.mutable
-import scala.compat.Platform
-import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-trait ShardingStrategy {
+trait ShardingStrategy[F[_]] {
 
-  def allocate(requester: Region, shard: Shard, current: Allocation): Option[Region]
+  def allocate(requester: Region, shard: Shard, current: Allocation): F[Option[Region]]
 
-  def rebalance(current: Allocation, inProgress: Set[Shard]): List[Shard]
+  def rebalance(current: Allocation, inProgress: Set[Shard]): F[List[Shard]]
 }
 
 object ShardingStrategy {
 
-  val Empty: ShardingStrategy = new ShardingStrategy {
+  def empty[F[_] : Applicative]: ShardingStrategy[F] = new ShardingStrategy[F] {
 
-    def allocate(requester: Region, shard: Shard, current: Allocation) = None
+    def allocate(requester: Region, shard: Shard, current: Allocation) = none[Region].pure[F]
 
-    def rebalance(current: Allocation, inProgress: Set[Shard]) = Nil
+    def rebalance(current: Allocation, inProgress: Set[Shard]) = List.empty[Shard].pure[F]
   }
 
 
-  val RequesterAllocation: ShardingStrategy = new ShardingStrategy {
+  def requesterAllocation[F[_] : Applicative]: ShardingStrategy[F] = new ShardingStrategy[F] {
 
-    def allocate(requester: Region, shard: Shard, current: Allocation) = Some(requester)
+    def allocate(requester: Region, shard: Shard, current: Allocation) = requester.some.pure[F]
 
-    def rebalance(current: Allocation, inProgress: Set[Shard]) = Nil
+    def rebalance(current: Allocation, inProgress: Set[Shard]) = List.empty[Shard].pure[F]
   }
 
 
   object TakeShards {
 
-    def apply(n: => Int, strategy: ShardingStrategy): ShardingStrategy = new ShardingStrategy {
+    def apply[F[_] : Monad](n: => Int, strategy: ShardingStrategy[F]): ShardingStrategy[F] = new ShardingStrategy[F] {
 
       def allocate(requester: Region, shard: Shard, current: Allocation) = {
         strategy.allocate(requester, shard, current)
@@ -44,8 +47,11 @@ object ShardingStrategy {
 
       def rebalance(current: Allocation, inProgress: Set[Shard]) = {
         val size = inProgress.size
-        if (size < n) strategy.rebalance(current, inProgress) take (n - size)
-        else Nil
+        if (size < n) {
+          strategy.rebalance(current, inProgress).map(_.take(n - size))
+        } else {
+          List.empty[Shard].pure[F]
+        }
       }
     }
   }
@@ -53,27 +59,33 @@ object ShardingStrategy {
 
   object FilterRegions {
 
-    def apply(f: Region => Boolean, strategy: ShardingStrategy): ShardingStrategy = {
-      new ShardingStrategy {
+    def apply[F[_] : Monad](f: Region => Boolean, strategy: ShardingStrategy[F]): ShardingStrategy[F] = {
+      new ShardingStrategy[F] {
 
         def allocate(requester: Region, shard: Shard, current: Allocation) = {
           val included = current.filter { case (region, _) => f(region) }
 
-          if (included.isEmpty) None
+          if (included.isEmpty) none[Region].pure[F]
           else {
-            val region = strategy.allocate(requester, shard, included)
-            if (included contains requester) region
-            else region filter (_ != requester) orElse included.keys.headOption
+            for {
+              region <- strategy.allocate(requester, shard, included)
+            } yield {
+              if (included contains requester) region
+              else region filter (_ != requester) orElse included.keys.headOption
+            }
           }
         }
 
         def rebalance(current: Allocation, inProgress: Set[Shard]) = {
           val (included, excluded) = current.partition { case (region, _) => f(region) }
-          if (included.isEmpty) Nil
+          if (included.isEmpty) List.empty[Shard].pure[F]
           else {
             val excludedShards = excluded.values.flatten.toList
-            val shards = strategy.rebalance(included, inProgress)
-            excludedShards ++ shards
+            for {
+              shards <- strategy.rebalance(included, inProgress)
+            } yield {
+              excludedShards ++ shards
+            }
           }
         }
       }
@@ -83,16 +95,19 @@ object ShardingStrategy {
 
   object FilterShards {
 
-    def apply(f: Shard => Boolean, strategy: ShardingStrategy): ShardingStrategy = {
-      new ShardingStrategy {
+    def apply[F[_] : FlatMap](f: Shard => Boolean, strategy: ShardingStrategy[F]): ShardingStrategy[F] = {
+      new ShardingStrategy[F] {
 
         def allocate(requester: Region, shard: Shard, current: Allocation) = {
           strategy.allocate(requester, shard, current)
         }
 
         def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-          val shards = strategy.rebalance(current, inProgress)
-          shards filter f
+          for {
+            shards <- strategy.rebalance(current, inProgress)
+          } yield {
+            shards filter f
+          }
         }
       }
     }
@@ -101,15 +116,21 @@ object ShardingStrategy {
 
   object Threshold {
 
-    def apply(n: => Int, strategy: ShardingStrategy): ShardingStrategy = {
-      new ShardingStrategy {
+    def apply[F[_] : Monad](n: => Int, strategy: ShardingStrategy[F]): ShardingStrategy[F] = {
+
+      new ShardingStrategy[F] {
+
         def allocate(requester: Region, shard: Shard, current: Allocation) = {
           strategy.allocate(requester, shard, current)
         }
 
         def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-          val shards = strategy.rebalance(current, inProgress)
-          if ((shards lengthCompare n) >= 0) shards else Nil
+          for {
+            shards <- strategy.rebalance(current, inProgress)
+          } yield {
+            if ((shards lengthCompare n) >= 0) shards
+            else List.empty[Shard]
+          }
         }
       }
     }
@@ -118,20 +139,30 @@ object ShardingStrategy {
 
   object AllocationStrategyProxy {
 
-    def apply(strategy: ShardingStrategy, fallback: Allocate = Allocate.Default): ShardAllocationStrategy = {
+    def apply[F[_] : FlatMap : ToFuture](
+      strategy: ShardingStrategy[F],
+      fallback: Allocate = Allocate.Default
+    ): ShardAllocationStrategy = {
+
       new ShardAllocationStrategy {
 
         def allocateShard(requester: Region, shardId: Shard, current: Allocation) = {
-          val region = strategy.allocate(requester, shardId, current) getOrElse {
-            fallback(requester, shardId, current)
+          val region = for {
+            region <- strategy.allocate(requester, shardId, current)
+          } yield {
+            region getOrElse fallback(requester, shardId, current)
           }
-          Future.successful(region)
+          ToFuture[F].apply { region }
         }
 
         def rebalance(current: Map[Region, IndexedSeq[Shard]], inProgress: Set[Shard]) = {
           val allocation = if (inProgress.isEmpty) current else current.mapValues { _ filterNot inProgress }
-          val shards = strategy.rebalance(allocation, inProgress)
-          Future.successful(shards.toSet)
+          val shards = for {
+            shards <- strategy.rebalance(allocation, inProgress)
+          } yield {
+            shards.toSet
+          }
+          ToFuture[F].apply { shards }
         }
       }
     }
@@ -140,11 +171,11 @@ object ShardingStrategy {
 
   object Logging {
 
-    def apply(
-      log: (() => String) => Unit,
-      strategy: ShardingStrategy,
+    def apply[F[_] : Monad](
+      strategy: ShardingStrategy[F],
+      log: (() => String) => F[Unit],
       toGlobal: Address => Address
-    ): ShardingStrategy = {
+    ): ShardingStrategy[F] = {
 
       def allocationToStr(current: Allocation) = {
         current map { case (region, shards) =>
@@ -166,28 +197,35 @@ object ShardingStrategy {
         s"$host:$port"
       }
 
-      new ShardingStrategy {
+      new ShardingStrategy[F] {
+
         def allocate(requester: Region, shard: Shard, current: Allocation) = {
-          val region = strategy.allocate(requester, shard, current)
-
-          def msg = s"allocate $shard to ${ region.fold("none") { regionToStr } }, " +
-            s"requester: ${ regionToStr(requester) }, " +
-            s"current: ${ allocationToStr(current) }"
-
-          log(() => msg)
-          region
+          for {
+            region <- strategy.allocate(requester, shard, current)
+            msg     = () => s"allocate $shard to ${ region.fold("none") { regionToStr } }, " +
+              s"requester: ${ regionToStr(requester) }, " +
+              s"current: ${ allocationToStr(current) }"
+            _ <- log(msg)
+          } yield {
+            region
+          }
         }
 
         def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-          val shards = strategy.rebalance(current, inProgress)
-          if (shards.nonEmpty) {
-            def msg = s"rebalance ${ shards mkString "," }, " +
-              s"${ if (inProgress.nonEmpty) s"inProgress(${ inProgress.size }): ${ iterToStr(inProgress) }" else "" }" +
-              s"current: ${ allocationToStr(current) }"
+          for {
+            shards <- strategy.rebalance(current, inProgress)
+            _      <- if (shards.nonEmpty) {
+              val msg = () => s"rebalance ${ shards mkString "," }, " +
+                s"${ if (inProgress.nonEmpty) s"inProgress(${ inProgress.size }): ${ iterToStr(inProgress) }" else "" }" +
+                s"current: ${ allocationToStr(current) }"
 
-            log(() => msg)
+              log(msg)
+            } else {
+              ().pure[F]
+            }
+          } yield {
+            shards
           }
-          shards
         }
       }
     }
@@ -199,24 +237,46 @@ object ShardingStrategy {
     */
   object ShardRebalanceCooldown {
 
-    def apply(cooldown: FiniteDuration, strategy: ShardingStrategy): ShardingStrategy = {
+    def of[F[_] : Sync : Clock](
+      cooldown: FiniteDuration,
+      strategy: ShardingStrategy[F],
+    ): F[ShardingStrategy[F]] = {
+      for {
+        allocationTime <- Ref[F].of(Map.empty[Shard, Long])
+      } yield {
+        apply(cooldown, strategy, allocationTime)
+      }
+    }
 
-      val allocationTime = mutable.Map.empty[Shard, Long]
+    def apply[F[_] : FlatMap : Clock](
+      cooldown: FiniteDuration,
+      strategy: ShardingStrategy[F],
+      allocationTime: Ref[F, Map[Shard, Long]]
+    ): ShardingStrategy[F] = {
 
-      new ShardingStrategy {
+      new ShardingStrategy[F] {
 
         def allocate(requester: Region, shard: Shard, current: Allocation) = {
-          val region = strategy.allocate(requester, shard, current)
-          allocationTime.put(shard, Platform.currentTime)
-          region
+          for {
+            region <- strategy.allocate(requester, shard, current)
+            timestamp <- Clock[F].millis
+            _ <- allocationTime.update { _.updated(shard, timestamp) }
+          } yield {
+            region
+          }
         }
 
         def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-          val shards = strategy.rebalance(current, inProgress)
-          val now = Platform.currentTime
-          shards filter { shard =>
-            val time = allocationTime get shard
-            time forall { _ + cooldown.toMillis <= now }
+          for {
+            shards         <- strategy.rebalance(current, inProgress)
+            now            <- Clock[F].millis
+            allocationTime <- allocationTime.get
+          } yield for {
+            shard <- shards
+            timestamp = allocationTime get shard
+            if timestamp.forall { _ + cooldown.toMillis <= now }
+          } yield {
+            shard
           }
         }
       }
@@ -224,33 +284,65 @@ object ShardingStrategy {
   }
 
 
-  implicit class ShardingStrategyOps(val self: ShardingStrategy) extends AnyVal {
+  implicit class ShardingStrategyOps[F[_]](val self: ShardingStrategy[F]) extends AnyVal {
 
     /**
       * At most n shards will be rebalanced at the same time
       */
-    def takeShards(n: => Int): ShardingStrategy = TakeShards(n, self)
+    def takeShards(n: => Int)(implicit F: Monad[F]): ShardingStrategy[F] = TakeShards(n, self)
+
 
     /**
       * Prevents rebalance until threshold of number of shards reached
       */
-    def rebalanceThreshold(n: => Int): ShardingStrategy = Threshold(n, self)
+    def rebalanceThreshold(n: => Int)(implicit F: Monad[F]): ShardingStrategy[F] = Threshold(n, self)
+
 
     /**
       * Allows shards allocation on included regions and rebalances off from excluded
       */
-    def filterRegions(f: Region => Boolean): ShardingStrategy = FilterRegions(f, self)
+    def filterRegions(f: Region => Boolean)(implicit F: Monad[F]): ShardingStrategy[F] = FilterRegions(f, self)
 
-    def filterShards(f: Shard => Boolean): ShardingStrategy = FilterShards(f, self)
 
-    def shardRebalanceCooldown(cooldown: FiniteDuration): ShardingStrategy = ShardRebalanceCooldown(cooldown, self)
+    def filterShards(f: Shard => Boolean)(implicit F: FlatMap[F]): ShardingStrategy[F] = FilterShards(f, self)
 
-    def toAllocationStrategy(fallback: Allocate = Allocate.Default): ShardAllocationStrategy = {
+
+    def shardRebalanceCooldown(
+      cooldown: FiniteDuration)(implicit
+      F: Sync[F],
+      clock: Clock[F]
+    ): F[ShardingStrategy[F]] = {
+      ShardRebalanceCooldown.of[F](cooldown, self)
+    }
+
+
+    def toAllocationStrategy(
+      fallback: Allocate = Allocate.Default)(implicit
+      F: FlatMap[F],
+      toFuture: ToFuture[F]
+    ): ShardAllocationStrategy = {
       AllocationStrategyProxy(self, fallback)
     }
 
-    def logging(toGlobal: Address => Address)(log: (() => String) => Unit): ShardingStrategy = {
-      Logging(log, self, toGlobal)
+
+    def logging(
+      toGlobal: Address => Address,
+      log: (() => String) => F[Unit])(implicit
+      F: Monad[F]
+    ): ShardingStrategy[F] = {
+      Logging[F](self, log, toGlobal)
+    }
+
+
+    def mapK[G[_]](f: F ~> G): ShardingStrategy[G] = new ShardingStrategy[G] {
+
+      def allocate(requester: Region, shard: Shard, current: Allocation) = {
+        f(self.allocate(requester, shard, current))
+      }
+
+      def rebalance(current: Allocation, inProgress: Set[Shard]) = {
+        f(self.rebalance(current, inProgress))
+      }
     }
   }
 }

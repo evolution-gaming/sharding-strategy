@@ -1,29 +1,32 @@
 package com.evolutiongaming.cluster.sharding
 
 import akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy
-
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
+import cats.FlatMap
+import cats.implicits._
+import com.evolutiongaming.catshelper.FromFuture
 
 object ShardingStrategyProxy {
 
-  def apply(timeout: Duration, strategy: ShardAllocationStrategy): ShardingStrategy = {
+  def apply[F[_] : FlatMap : FromFuture](strategy: ShardAllocationStrategy): ShardingStrategy[F] = {
 
-    def await[T](future: Future[T]): T = Await.result(future, timeout)
+    new ShardingStrategy[F] {
 
-    new ShardingStrategy {
       def allocate(requester: Region, shard: Shard, current: Allocation) = {
-        val region = await {
-          strategy.allocateShard(requester, shard, current)
+        val region = FromFuture[F].apply { strategy.allocateShard(requester, shard, current) }
+        for {
+          region <- region
+        } yield {
+          region.some
         }
-        Some(region)
       }
 
       def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-        val shards = await {
-          strategy.rebalance(current, inProgress)
+        val shards = FromFuture[F].apply { strategy.rebalance(current, inProgress) }
+        for {
+          shards <- shards
+        } yield {
+          shards.toList
         }
-        shards.toList
       }
     }
   }

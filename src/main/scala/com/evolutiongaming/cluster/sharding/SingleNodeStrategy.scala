@@ -1,27 +1,31 @@
 package com.evolutiongaming.cluster.sharding
 
 import akka.actor.Address
+import cats.Applicative
+import cats.implicits._
 
 object SingleNodeStrategy {
 
-  def apply(address: => Option[Address], addressOf: AddressOf): ShardingStrategy = {
+  def apply[F[_] : Applicative](address: => Option[Address], addressOf: AddressOf): ShardingStrategy[F] = {
 
     def regionByAddress(address: Address, current: Allocation) = {
       current.keys find { region => addressOf(region) == address }
     }
 
-    new ShardingStrategy {
+    new ShardingStrategy[F] {
 
       def allocate(requester: Region, shard: Shard, current: Allocation) = {
-        for {
+        val region = for {
           address <- address
-          region <- regionByAddress(address, current)
+          region  <- regionByAddress(address, current)
         } yield region
+
+        region.pure[F]
       }
 
       def rebalance(current: Allocation, inProgress: Set[Shard]) = {
         val shards = for {
-          address <- address.toIterable
+          address          <- address.toIterable
           (region, shards) <- current
           if shards.nonEmpty
           if addressOf(region) != address
@@ -29,7 +33,7 @@ object SingleNodeStrategy {
           shard <- shards
         } yield shard
 
-        shards.toList.sorted
+        shards.toList.sorted.pure[F]
       }
     }
   }

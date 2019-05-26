@@ -1,8 +1,11 @@
 package com.evolutiongaming.cluster.sharding
 
+import cats.Applicative
+import cats.implicits._
+
 object LeastShardsStrategy {
 
-  def apply(): ShardingStrategy = new ShardingStrategy {
+  def apply[F[_] : Applicative](): ShardingStrategy[F] = new ShardingStrategy[F] {
 
     val reversedOrdering = Ordering[Int].reverse
 
@@ -15,16 +18,19 @@ object LeastShardsStrategy {
         else if (shardsSize == min) (min, region :: regions)
         else (min, regions)
       }
-      if (regions.size == current.size) None
-      else if (current forall { case (_, shards) => shards.size == min }) None
-      else if (regions contains requester) Some(requester)
-      else regions.headOption
+      val region = {
+        if (regions.size == current.size) none[Region]
+        else if (current forall { case (_, shards) => shards.size == min }) none[Region]
+        else if (regions contains requester) requester.some
+        else regions.headOption
+      }
+      region.pure[F]
     }
 
     def rebalance(current: Allocation, inProgress: Set[Shard]) = {
 
       val regionsSize = current.size
-      if (regionsSize >= 2) {
+      val shards = if (regionsSize >= 2) {
         val shards = current.map { case (_, shards) => shards.toList }.toSeq.sortBy(_.size)
         val shardsSize = shards.foldLeft(0) { case (sum, shards) => sum + shards.size }
         val distribution = {
@@ -51,8 +57,9 @@ object LeastShardsStrategy {
 
         result
       } else {
-        Nil
+        List.empty[Shard]
       }
+      shards.pure[F]
     }
   }
 }

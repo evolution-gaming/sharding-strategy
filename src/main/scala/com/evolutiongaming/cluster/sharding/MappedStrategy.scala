@@ -7,19 +7,23 @@ import akka.cluster.ddata._
 import cats.effect.concurrent.Ref
 import cats.effect.{Resource, Sync}
 import cats.implicits._
-import cats.~>
-import com.evolutiongaming.catshelper.{FromFuture, ToFuture, ToTry}
+import cats.temp.par._
+import cats.{FlatMap, Parallel, ~>}
+import com.evolutiongaming.catshelper.{FromFuture, ToFuture}
 import com.evolutiongaming.cluster.ddata.SafeReplicator
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.util.Try
 import scala.util.control.NoStackTrace
 
 
 object MappedStrategy {
 
-  def of[F[_] : Sync : FromFuture : ToFuture : ToTry](typeName: String)(implicit actorSystem: ActorSystem): Resource[F, ShardingStrategy] = {
+  def of[F[_] : Sync : Par : FromFuture : ToFuture](
+    typeName: String)(implicit
+    actorSystem: ActorSystem
+  ): Resource[F, ShardingStrategy[F]] = {
+
     val ext = Sync[F].delay { Ext(actorSystem) }
     val addressOf = Sync[F].delay { AddressOf(actorSystem) }
     for {
@@ -27,38 +31,46 @@ object MappedStrategy {
       addressOf <- Resource.liftF(addressOf)
       mapping   <- Mapping.of[F](typeName, ext.replicatorRef)
     } yield {
-      val toTry = new (F ~> Try) {
-        def apply[A](fa: F[A]) = ToTry[F].apply(fa) // TODO remove
-      }
-      val mappingTry = mapping.mapK(toTry)
-      apply(mappingTry, addressOf)
+      apply(mapping, addressOf)
     }
   }
 
-  def apply(mapping: Mapping[Try]/*TODO*/, addressOf: AddressOf): ShardingStrategy = {
+  def apply[F[_] : FlatMap : Par](mapping: Mapping[F], addressOf: AddressOf): ShardingStrategy[F] = {
 
     def regionByAddress(address: Address, current: Allocation) = {
       current.keys find { region => addressOf(region) == address }
     }
 
-    new ShardingStrategy {
+    new ShardingStrategy[F] {
 
       def allocate(requester: Region, shard: Shard, current: Allocation) = {
         for {
-          address <- (mapping get shard).get
+          address <- mapping get shard
+        } yield for {
+          address <- address
           region  <- regionByAddress(address, current)
-        } yield region
+        } yield {
+          region
+        }
       }
 
       def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-        val toRebalance = for {
+        val shards = for {
           (region, shards) <- current
           shard            <- shards
-          address          <- (mapping get shard).get
-          if addressOf(region) != address && regionByAddress(address, current).isDefined
-        } yield shard
+        } yield for {
+          address <- mapping get shard
+        } yield for {
+          address <- address if addressOf(region) != address && regionByAddress(address, current).isDefined
+        } yield {
+          shard
+        }
 
-        toRebalance.toList.sorted
+        for {
+          shards <- Parallel.parSequence(shards.toList)
+        } yield {
+          shards.flatten.sorted
+        }
       }
     }
   }

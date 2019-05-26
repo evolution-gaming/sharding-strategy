@@ -1,6 +1,7 @@
 package com.evolutiongaming.cluster.sharding
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, Props}
+import cats.Id
 import org.scalatest.{Matchers, WordSpec}
 
 import scala.collection.immutable.IndexedSeq
@@ -11,12 +12,7 @@ class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
 
     "filterRegions" in {
 
-      val stub = new ShardingStrategy {
-        def allocate(requester: ActorRef, shard: Shard, current: Allocation) = Some(requester)
-        def rebalance(current: Allocation, inProgress: Set[Shard]) = Nil
-      }
-
-      val strategy = stub.filterRegions(_ == region1)
+      val strategy = ShardingStrategy.requesterAllocation[Id].filterRegions(_ == region1)
 
       val allocation = Map(
         region1 -> IndexedSeq(shard1),

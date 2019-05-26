@@ -1,25 +1,28 @@
 package com.evolutiongaming.cluster.sharding
 
 import akka.actor.ActorRef
-import akka.cluster.sharding.ShardRegion
+import cats.Applicative
+import cats.implicits._
 
 object RemoteNodeStrategy {
 
-  def apply(): ShardingStrategy = {
+  def apply[F[_] : Applicative]: ShardingStrategy[F] = {
     apply(_.path.address.hasLocalScope)
   }
 
-  def apply(isLocal: ActorRef => Boolean): ShardingStrategy = {
-    new ShardingStrategy {
+  def apply[F[_] : Applicative](isLocal: ActorRef => Boolean): ShardingStrategy[F] = {
+    new ShardingStrategy[F] {
 
       def allocate(requester: ActorRef, shard: Shard, current: Allocation) = {
         val regions = current.keys
-        regions find { region => !isLocal(region) }
+        val region = regions.find { region => !isLocal(region) }
+        region.pure[F]
       }
 
       def rebalance(current: Allocation, inProgress: Set[Shard]) = {
         val (local, remote) = current.partition { case (region, _) => isLocal(region) }
-        if (remote.nonEmpty) local.values.flatten.toList else List.empty[ShardRegion.ShardId]
+        val shards = if (remote.nonEmpty) local.values.flatten.toList else List.empty[Shard]
+        shards.pure[F]
       }
     }
   }
