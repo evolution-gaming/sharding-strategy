@@ -1,6 +1,6 @@
 package com.evolutiongaming.cluster.sharding
 
-import akka.actor.{Actor, Address, Props}
+import akka.actor.Address
 import cats.effect.IO
 import cats.effect.concurrent.Ref
 import com.evolutiongaming.cluster.sharding.AdaptiveStrategy.Counters
@@ -195,14 +195,7 @@ class AdaptiveStrategySpec extends AsyncFunSuite with ActorSpec with Matchers {
   }
 
 
-  private def newRegion() = {
-    def actor() = new Actor {
-      def receive = PartialFunction.empty
-    }
-
-    val props = Props(actor())
-    system.actorOf(props)
-  }
+  private def newRegion() = RegionOf(actorSystem)
 
   private def newAddress(ip: String) = Address("", "", ip, 2552)
 

@@ -6,11 +6,11 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 
 trait ActorSpec extends BeforeAndAfterAll { this: Suite =>
 
-  implicit lazy val system: ActorSystem = ActorSystem(getClass.getSimpleName)
+  implicit lazy val actorSystem: ActorSystem = ActorSystem(getClass.getSimpleName)
 
   override protected def afterAll() = {
-    TestKit.shutdownActorSystem(system)
+    TestKit.shutdownActorSystem(actorSystem)
   }
 
-  abstract class ActorScope extends TestKit(system) with ImplicitSender with DefaultTimeout
+  abstract class ActorScope extends TestKit(actorSystem) with ImplicitSender with DefaultTimeout
 }

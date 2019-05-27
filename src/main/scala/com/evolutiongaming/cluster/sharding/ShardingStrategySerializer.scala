@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 
 import akka.actor.{Address, ExtendedActorSystem}
 import akka.serialization.{SerializationExtension, SerializerWithStringManifest}
+import java.nio.charset.StandardCharsets.UTF_8
 
 class ShardingStrategySerializer(system: ExtendedActorSystem) extends SerializerWithStringManifest {
 
@@ -11,11 +12,12 @@ class ShardingStrategySerializer(system: ExtendedActorSystem) extends Serializer
 
   def identifier: Int = 730771473
 
-  private val StrategyKeyManifest = "AdaptiveStrategy.Key"
+  private val ManifestOld = "AdaptiveStrategy.Key"
+  private val ManifestNew = "A"
 
   def manifest(x: AnyRef): String = {
     x match {
-      case _: AdaptiveStrategy.Key => StrategyKeyManifest
+      case _: AdaptiveStrategy.Key => ManifestOld
       case _                       => sys.error(s"Cannot serialize message of ${ x.getClass } in ${ getClass.getName }")
     }
   }
@@ -29,8 +31,9 @@ class ShardingStrategySerializer(system: ExtendedActorSystem) extends Serializer
 
   def fromBinary(bytes: Array[Byte], manifest: String): AnyRef = {
     manifest match {
-      case StrategyKeyManifest => strategyKeyFromBinary(bytes)
-      case _                   => sys.error(s"Cannot deserialize message for manifest $manifest in ${ getClass.getName }")
+      case ManifestOld => strategyKeyFromBinary(bytes)
+      case ManifestNew => strategyKeyFromBinary(bytes)
+      case _           => sys.error(s"Cannot deserialize message for manifest $manifest in ${ getClass.getName }")
     }
   }
 
@@ -55,8 +58,8 @@ class ShardingStrategySerializer(system: ExtendedActorSystem) extends Serializer
       case _ if serializer.includeManifest          => address.getClass.getName
       case _                                        => ""
     }
-    val bytesManifest = manifest.getBytes("UTF-8")
-    val bytesShard = x.shard.getBytes("UTF-8")
+    val bytesManifest = manifest.getBytes(UTF_8)
+    val bytesShard = x.shard.getBytes(UTF_8)
     val buffer = ByteBuffer.allocate(4 + 4 + 4 + 4 + bytesManifest.length + bytesAddress.length + bytesShard.length)
     buffer.putInt(serializer.identifier)
     buffer.putInt(bytesManifest.length)
@@ -70,7 +73,7 @@ class ShardingStrategySerializer(system: ExtendedActorSystem) extends Serializer
 
   private def readStr(buffer: ByteBuffer) = {
     val bytes = readBytes(buffer)
-    new String(bytes, "UTF-8")
+    new String(bytes, UTF_8)
   }
 
   private def readBytes(buffer: ByteBuffer) = {

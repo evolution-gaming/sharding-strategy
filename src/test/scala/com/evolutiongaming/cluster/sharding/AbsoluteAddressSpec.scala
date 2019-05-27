@@ -12,7 +12,7 @@ class AbsoluteAddressSpec extends FunSuite with ActorSpec with Matchers {
     }
 
     val props = Props(actor())
-    val ref = system.actorOf(props)
-    AbsoluteAddress(system).apply(ref.path.address) shouldEqual Address("akka", "AbsoluteAddressSpec")
+    val ref = actorSystem.actorOf(props)
+    AbsoluteAddress(actorSystem).apply(ref.path.address) shouldEqual Address("akka", "AbsoluteAddressSpec")
   }
 }

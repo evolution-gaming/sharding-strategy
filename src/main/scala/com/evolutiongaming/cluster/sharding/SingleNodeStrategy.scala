@@ -19,7 +19,6 @@ object SingleNodeStrategy {
           address <- address
           region  <- regionByAddress(address, current)
         } yield region
-
         region.pure[F]
       }
 
@@ -30,7 +29,7 @@ object SingleNodeStrategy {
           if shards.nonEmpty
           if addressOf(region) != address
           if regionByAddress(address, current).isDefined
-          shard <- shards
+          shard            <- shards
         } yield shard
 
         shards.toList.sorted.pure[F]

@@ -7,29 +7,21 @@ import org.scalatest.{FunSuite, Matchers}
 
 import scala.collection.immutable.IndexedSeq
 
-class MappedStrategySpec extends FunSuite with ActorSpec with Matchers {
+class SingleNodeStrategySpec extends FunSuite with ActorSpec with Matchers {
 
-  private val shard = "shard"
   private val region1 = RegionOf(actorSystem)
   private val region2 = RegionOf(actorSystem)
+  private val shard = "shard"
+
   private val address1 = Address("", "", "127.0.0.1", 2552)
   private val address2 = Address("", "", "127.0.0.2", 2552)
-
-  private def strategyOf(address: Option[Address]) = {
-    val addressOf = new AddressOf {
-      def apply(region: Region) = region match {
-        case `region1` => address1
-        case `region2` => address2
-        case _         => region.path.address
-      }
+  private val addressOf = new AddressOf {
+    def apply(region: Region) = region match {
+      case `region1` => address1
+      case `region2` => address2
+      case _         => region.path.address
     }
-    val mapping = new MappedStrategy.Mapping[Id] {
-      def get(shard: Shard) = address
-      def set(shard: Shard, address: Address) = {}
-    }
-    MappedStrategy[Id](mapping, addressOf)
   }
-
   for {
     (shard, allocation, address, expected) <- List(
       (shard, Map((region1, IndexedSeq.empty[Shard]), (region2, IndexedSeq.empty[Shard])), none[Address], none[Region]),
@@ -39,7 +31,7 @@ class MappedStrategySpec extends FunSuite with ActorSpec with Matchers {
     )
   } {
     test(s"allocate shard: $shard, address: $address, allocation: $allocation") {
-      val strategy = strategyOf(address)
+      val strategy = SingleNodeStrategy[Id](address = address, addressOf)
       strategy.allocate(region1, shard, allocation) shouldEqual expected
     }
   }
@@ -55,7 +47,7 @@ class MappedStrategySpec extends FunSuite with ActorSpec with Matchers {
     )
   } {
     test(s"rebalance address: $address, allocation: $allocation") {
-      val strategy = strategyOf(address)
+      val strategy = SingleNodeStrategy[Id](address = address, addressOf)
       strategy.rebalance(allocation, Set.empty) shouldEqual expected
     }
   }

@@ -145,19 +145,18 @@ object MappedStrategy {
             }
 
             def update(data: LWWMap[Shard, Address], cache: Map[Shard, Address]) = {
-              if (mapped(data.entries) && mapped(cache)) {
-                false.pure[F]
-              } else {
-                replicator.update { data => (data getOrElse empty).put(selfUniqueAddress, shard, address) }.as(true)
-              }
+              if (mapped(data.entries) && mapped(cache)) ().pure[F]
+              else for {
+                _ <- replicator.update { data => (data getOrElse empty).put(selfUniqueAddress, shard, address) }
+                _ <- replicator.flushChanges
+              } yield {}
             }
 
             val result = for {
               data    <- data
               cache   <- cache.get
-              updated <- update(data, cache)
-               _      <- if (updated) replicator.flushChanges else ().pure[F]
-            } yield {}
+              result <- update(data, cache)
+            } yield result
 
             result.handleErrorWith { error =>
               MappingError(shard, address, s"failed to map $shard to $address: $error", error).raiseError[F, Unit]

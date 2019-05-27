@@ -1,6 +1,5 @@
 package com.evolutiongaming.cluster.sharding
 
-import akka.actor.{Actor, Props}
 import cats.Id
 import org.scalatest.{Matchers, WordSpec}
 
@@ -226,12 +225,5 @@ class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
   val shard8 = "shard8"
 
 
-  def newRegion() = {
-    def actor = new Actor {
-      def receive: Receive = PartialFunction.empty
-    }
-
-    val props = Props(actor)
-    system.actorOf(props)
-  }
+  def newRegion() = RegionOf(actorSystem)
 }
