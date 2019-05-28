@@ -39,19 +39,27 @@ object ShardingStrategy {
 
   object TakeShards {
 
-    def apply[F[_] : Monad](n: => Int, strategy: ShardingStrategy[F]): ShardingStrategy[F] = new ShardingStrategy[F] {
+    def apply[F[_] : Monad](numberOfShards: => F[Int], strategy: ShardingStrategy[F]): ShardingStrategy[F] = new ShardingStrategy[F] {
 
       def allocate(requester: Region, shard: Shard, current: Allocation) = {
         strategy.allocate(requester, shard, current)
       }
 
       def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-        val size = inProgress.size
-        if (size < n) {
-          strategy.rebalance(current, inProgress).map(_.take(n - size))
-        } else {
-          List.empty[Shard].pure[F]
+
+        def rebalance(numberOfShards: Int) = {
+          val size = inProgress.size
+          if (size < numberOfShards) {
+            strategy.rebalance(current, inProgress).map(_.take(numberOfShards - size))
+          } else {
+            List.empty[Shard].pure[F]
+          }
         }
+
+        for {
+          numberOfShards <- numberOfShards
+          shards         <- rebalance(numberOfShards)
+        } yield shards
       }
     }
   }
@@ -59,14 +67,12 @@ object ShardingStrategy {
 
   object FilterRegions {
 
-    def apply[F[_] : Monad](f: Region => Boolean, strategy: ShardingStrategy[F]): ShardingStrategy[F] = {
+    def apply[F[_] : Monad](filter: F[Region => Boolean], strategy: ShardingStrategy[F]): ShardingStrategy[F] = {
       new ShardingStrategy[F] {
 
         def allocate(requester: Region, shard: Shard, current: Allocation) = {
-          val included = current.filter { case (region, _) => f(region) }
 
-          if (included.isEmpty) none[Region].pure[F]
-          else {
+          def allocate(included: Allocation) = {
             for {
               region <- strategy.allocate(requester, shard, included)
             } yield {
@@ -74,12 +80,17 @@ object ShardingStrategy {
               else region filter (_ != requester) orElse included.keys.headOption
             }
           }
+
+          for {
+            filter   <- filter
+            included  = current.filter { case (region, _) => filter(region) }
+            region   <- if (included.nonEmpty) allocate(included) else none[Region].pure[F]
+          } yield region
         }
 
         def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-          val (included, excluded) = current.partition { case (region, _) => f(region) }
-          if (included.isEmpty) List.empty[Shard].pure[F]
-          else {
+
+          def rebalance(included: Allocation, excluded: Allocation) = {
             val excludedShards = excluded.values.flatten.toList
             for {
               shards <- strategy.rebalance(included, inProgress)
@@ -87,6 +98,12 @@ object ShardingStrategy {
               excludedShards ++ shards
             }
           }
+
+          for {
+            filter               <- filter
+            (included, excluded)  = current.partition { case (region, _) => filter(region) }
+            shards               <- if (included.nonEmpty) rebalance(included, excluded) else List.empty[Shard].pure[F]
+          } yield shards
         }
       }
     }
@@ -95,7 +112,7 @@ object ShardingStrategy {
 
   object FilterShards {
 
-    def apply[F[_] : FlatMap](f: Shard => Boolean, strategy: ShardingStrategy[F]): ShardingStrategy[F] = {
+    def apply[F[_] : FlatMap](filter: F[Shard => Boolean], strategy: ShardingStrategy[F]): ShardingStrategy[F] = {
       new ShardingStrategy[F] {
 
         def allocate(requester: Region, shard: Shard, current: Allocation) = {
@@ -105,8 +122,9 @@ object ShardingStrategy {
         def rebalance(current: Allocation, inProgress: Set[Shard]) = {
           for {
             shards <- strategy.rebalance(current, inProgress)
+            filter <- filter
           } yield {
-            shards filter f
+            shards filter filter
           }
         }
       }
@@ -116,7 +134,7 @@ object ShardingStrategy {
 
   object Threshold {
 
-    def apply[F[_] : Monad](n: => Int, strategy: ShardingStrategy[F]): ShardingStrategy[F] = {
+    def apply[F[_] : Monad](threshold: => F[Int], strategy: ShardingStrategy[F]): ShardingStrategy[F] = {
 
       new ShardingStrategy[F] {
 
@@ -126,9 +144,10 @@ object ShardingStrategy {
 
         def rebalance(current: Allocation, inProgress: Set[Shard]) = {
           for {
-            shards <- strategy.rebalance(current, inProgress)
+            shards    <- strategy.rebalance(current, inProgress)
+            threshold <- threshold
           } yield {
-            if ((shards lengthCompare n) >= 0) shards
+            if ((shards lengthCompare threshold) >= 0) shards
             else List.empty[Shard]
           }
         }
@@ -289,22 +308,30 @@ object ShardingStrategy {
     /**
       * At most n shards will be rebalanced at the same time
       */
-    def takeShards(n: => Int)(implicit F: Monad[F]): ShardingStrategy[F] = TakeShards(n, self)
+    def takeShards(numberOfShards: => F[Int])(implicit F: Monad[F]): ShardingStrategy[F] = {
+      TakeShards(numberOfShards, self)
+    }
 
 
     /**
       * Prevents rebalance until threshold of number of shards reached
       */
-    def rebalanceThreshold(n: => Int)(implicit F: Monad[F]): ShardingStrategy[F] = Threshold(n, self)
+    def rebalanceThreshold(numberOfShards: => F[Int])(implicit F: Monad[F]): ShardingStrategy[F] = {
+      Threshold(numberOfShards, self)
+    }
 
 
     /**
       * Allows shards allocation on included regions and rebalances off from excluded
       */
-    def filterRegions(f: Region => Boolean)(implicit F: Monad[F]): ShardingStrategy[F] = FilterRegions(f, self)
+    def filterRegions(filter: F[Region => Boolean])(implicit F: Monad[F]): ShardingStrategy[F] = {
+      FilterRegions(filter, self)
+    }
 
 
-    def filterShards(f: Shard => Boolean)(implicit F: FlatMap[F]): ShardingStrategy[F] = FilterShards(f, self)
+    def filterShards(filter: F[Shard => Boolean])(implicit F: FlatMap[F]): ShardingStrategy[F] = {
+      FilterShards(filter, self)
+    }
 
 
     def shardRebalanceCooldown(
