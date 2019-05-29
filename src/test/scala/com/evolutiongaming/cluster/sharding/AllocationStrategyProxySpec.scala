@@ -19,7 +19,11 @@ class AllocationStrategyProxySpec extends AsyncFunSuite with ActorSpec with Matc
     val allocation = Map((region, IndexedSeq(shard)))
     val result = for {
       strategy0 <- ShardingStrategy.empty[IO].shardRebalanceCooldown(1.second)
-      strategy   = strategy0.toAllocationStrategy().logging(_ => ())
+      strategy   = strategy0
+        .toAllocationStrategy()
+        .logging(_ => ())
+        .toShardingStrategy[IO]
+        .toAllocationStrategy()
       region1   <- FromFuture[IO].apply { strategy.allocateShard(region, shard, allocation) }
     } yield {
       region1 shouldEqual region
@@ -31,10 +35,14 @@ class AllocationStrategyProxySpec extends AsyncFunSuite with ActorSpec with Matc
     val allocation = Map((region, IndexedSeq(shard)))
     val result = for {
       strategy0 <- ShardingStrategy.empty[IO].shardRebalanceCooldown(1.second)
-      strategy   = strategy0.toAllocationStrategy().logging(_ => ())
-      region1   <- FromFuture[IO].apply { strategy.rebalance(allocation, Set(shard)) }
+      strategy   = strategy0
+        .toAllocationStrategy()
+        .logging(_ => ())
+        .toShardingStrategy[IO]
+        .toAllocationStrategy()
+      shards    <- FromFuture[IO].apply { strategy.rebalance(allocation, Set(shard)) }
     } yield {
-      region1 shouldEqual Set.empty
+      shards shouldEqual Set.empty
     }
 
     result.run()
