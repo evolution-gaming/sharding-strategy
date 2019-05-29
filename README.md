@@ -2,6 +2,8 @@
 
 Alternative to [akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy](https://github.com/akka/akka/blob/master/akka-cluster-sharding/src/main/scala/akka/cluster/sharding/ShardCoordinator.scala#L72)
 
+## Api
+
 ```scala
 trait ShardingStrategy[F[_]] {
 
@@ -9,6 +11,19 @@ trait ShardingStrategy[F[_]] {
 
   def rebalance(current: Allocation, inProgress: Set[Shard]): F[List[Shard]]
 }
+```
+
+## Syntax
+
+```scala
+val strategy = LeastShardsStrategy()
+  .filterShards(...)
+  .filterRegions(...)
+  .rebalanceThreshold(10)
+  .takeShards(10) 
+  .shardRebalanceCooldown(1.minute)
+  .logging(...)
+  .toAllocationStrategy()
 ```
 
 ## Setup
