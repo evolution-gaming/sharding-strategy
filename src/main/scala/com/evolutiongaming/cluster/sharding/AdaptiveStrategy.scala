@@ -378,7 +378,7 @@ object AdaptiveStrategy {
 
 object AdaptiveStrategyAndExtractShardId {
 
-  def apply[F[_] : Sync : LogOf : FromFuture : ToFuture : ToTry : Par](
+  def of[F[_] : Sync : LogOf : FromFuture : ToFuture : ToTry : Par](
     typeName: String,
     rebalanceThresholdPercent: Int,
     msgWeight: AdaptiveStrategy.MsgWeight,
