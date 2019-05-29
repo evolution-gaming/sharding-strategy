@@ -12,7 +12,8 @@ import scala.collection.immutable.IndexedSeq
 class AllocationStrategyProxySpec extends AsyncFunSuite with ActorSpec with Matchers {
   private val region = RegionOf(actorSystem)
   private val shard = "shard"
-
+  private val ignore = (msg: () => String) => {msg(); ()}
+  
   private implicit val addressOf = AddressOf(actorSystem)
 
   test("allocate") {
@@ -21,7 +22,7 @@ class AllocationStrategyProxySpec extends AsyncFunSuite with ActorSpec with Matc
       strategy0 <- ShardingStrategy.empty[IO].shardRebalanceCooldown(1.second)
       strategy   = strategy0
         .toAllocationStrategy()
-        .logging(_ => ())
+        .logging(ignore)
         .toShardingStrategy[IO]
         .toAllocationStrategy()
       region1   <- FromFuture[IO].apply { strategy.allocateShard(region, shard, allocation) }
@@ -37,7 +38,7 @@ class AllocationStrategyProxySpec extends AsyncFunSuite with ActorSpec with Matc
       strategy0 <- ShardingStrategy.empty[IO].shardRebalanceCooldown(1.second)
       strategy   = strategy0
         .toAllocationStrategy()
-        .logging(_ => ())
+        .logging(ignore)
         .toShardingStrategy[IO]
         .toAllocationStrategy()
       shards    <- FromFuture[IO].apply { strategy.rebalance(allocation, Set(shard)) }
