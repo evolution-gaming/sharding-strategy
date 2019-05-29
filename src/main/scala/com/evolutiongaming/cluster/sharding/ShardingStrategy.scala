@@ -1,6 +1,5 @@
 package com.evolutiongaming.cluster.sharding
 
-import akka.actor.Address
 import akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy
 import cats.effect.concurrent.Ref
 import cats.effect.{Clock, Sync}
@@ -39,27 +38,29 @@ object ShardingStrategy {
 
   object TakeShards {
 
-    def apply[F[_] : Monad](numberOfShards: => F[Int], strategy: ShardingStrategy[F]): ShardingStrategy[F] = new ShardingStrategy[F] {
+    def apply[F[_] : Monad](numberOfShards: => F[Int], strategy: ShardingStrategy[F]): ShardingStrategy[F] = {
+      new ShardingStrategy[F] {
 
-      def allocate(requester: Region, shard: Shard, current: Allocation) = {
-        strategy.allocate(requester, shard, current)
-      }
-
-      def rebalance(current: Allocation, inProgress: Set[Shard]) = {
-
-        def rebalance(numberOfShards: Int) = {
-          val size = inProgress.size
-          if (size < numberOfShards) {
-            strategy.rebalance(current, inProgress).map(_.take(numberOfShards - size))
-          } else {
-            List.empty[Shard].pure[F]
-          }
+        def allocate(requester: Region, shard: Shard, current: Allocation) = {
+          strategy.allocate(requester, shard, current)
         }
 
-        for {
-          numberOfShards <- numberOfShards
-          shards         <- rebalance(numberOfShards)
-        } yield shards
+        def rebalance(current: Allocation, inProgress: Set[Shard]) = {
+
+          def rebalance(numberOfShards: Int) = {
+            val size = inProgress.size
+            if (size < numberOfShards) {
+              strategy.rebalance(current, inProgress).map(_.take(numberOfShards - size))
+            } else {
+              List.empty[Shard].pure[F]
+            }
+          }
+
+          for {
+            numberOfShards <- numberOfShards
+            shards         <- rebalance(numberOfShards)
+          } yield shards
+        }
       }
     }
   }
@@ -193,7 +194,7 @@ object ShardingStrategy {
     def apply[F[_] : Monad](
       strategy: ShardingStrategy[F],
       log: (() => String) => F[Unit],
-      toGlobal: Address => Address
+      addressOf: AddressOf,
     ): ShardingStrategy[F] = {
 
       def allocationToStr(current: Allocation) = {
@@ -210,7 +211,7 @@ object ShardingStrategy {
       }
 
       def regionToStr(region: Region) = {
-        val address = toGlobal(region.path.address)
+        val address = addressOf(region)
         val host = address.host.fold("none") { _.toString }
         val port = address.port.fold("none") { _.toString }
         s"$host:$port"
@@ -235,7 +236,7 @@ object ShardingStrategy {
             shards <- strategy.rebalance(current, inProgress)
             _      <- if (shards.nonEmpty) {
               val msg = () => s"rebalance ${ shards mkString "," }, " +
-                s"${ if (inProgress.nonEmpty) s"inProgress(${ inProgress.size }): ${ iterToStr(inProgress) }" else "" }" +
+                s"${ if (inProgress.nonEmpty) s"inProgress(${ inProgress.size }): ${ iterToStr(inProgress) }, " else "" }" +
                 s"current: ${ allocationToStr(current) }"
 
               log(msg)
@@ -277,9 +278,9 @@ object ShardingStrategy {
 
         def allocate(requester: Region, shard: Shard, current: Allocation) = {
           for {
-            region <- strategy.allocate(requester, shard, current)
+            region    <- strategy.allocate(requester, shard, current)
             timestamp <- Clock[F].millis
-            _ <- allocationTime.update { _.updated(shard, timestamp) }
+            _         <- allocationTime.update { _.updated(shard, timestamp) }
           } yield {
             region
           }
@@ -353,11 +354,11 @@ object ShardingStrategy {
 
 
     def logging(
-      toGlobal: Address => Address,
       log: (() => String) => F[Unit])(implicit
-      F: Monad[F]
+      F: Monad[F],
+      addressOf: AddressOf
     ): ShardingStrategy[F] = {
-      Logging[F](self, log, toGlobal)
+      Logging[F](self, log, addressOf)
     }
 
 

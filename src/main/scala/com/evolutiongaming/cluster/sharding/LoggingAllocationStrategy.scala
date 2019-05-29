@@ -1,6 +1,5 @@
 package com.evolutiongaming.cluster.sharding
 
-import akka.actor.Address
 import akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -10,7 +9,7 @@ object LoggingAllocationStrategy {
   def apply(
     log: (() => String) => Unit,
     strategy: ShardAllocationStrategy,
-    toGlobal: Address => Address)(implicit
+    addressOf: AddressOf)(implicit
     executor: ExecutionContext
   ): ShardAllocationStrategy = {
 
@@ -28,7 +27,7 @@ object LoggingAllocationStrategy {
     }
 
     def regionToStr(region: Region) = {
-      val address = toGlobal(region.path.address)
+      val address = addressOf(region)
       val host = address.host.fold("none") { _.toString }
       val port = address.port.fold("none") { _.toString }
       s"$host:$port"
@@ -53,7 +52,7 @@ object LoggingAllocationStrategy {
         shards foreach { shards =>
           if (shards.nonEmpty) {
             def msg = s"rebalance ${ shards mkString "," }, " +
-              s"${ if (inProgress.nonEmpty) s"inProgress(${ inProgress.size }): ${ iterToStr(inProgress) }" else "" }" +
+              s"${ if (inProgress.nonEmpty) s"inProgress(${ inProgress.size }): ${ iterToStr(inProgress) }, " else "" }" +
               s"current: ${ allocationToStr(current) }"
 
             log(() => msg)

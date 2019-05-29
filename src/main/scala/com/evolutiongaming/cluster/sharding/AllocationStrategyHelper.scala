@@ -1,6 +1,5 @@
 package com.evolutiongaming.cluster.sharding
 
-import akka.actor.Address
 import akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy
 import cats.FlatMap
 import com.evolutiongaming.catshelper.FromFuture
@@ -17,11 +16,11 @@ object AllocationStrategyHelper {
     }
 
     def logging(
-      toGlobal: Address => Address)(
       log: (() => String) => Unit)(implicit
+      addressOf: AddressOf,
       executor: ExecutionContext
     ): ShardAllocationStrategy = {
-      LoggingAllocationStrategy(log, self, toGlobal)
+      LoggingAllocationStrategy(log, self, addressOf)
     }
   }
 }

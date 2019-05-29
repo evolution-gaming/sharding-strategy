@@ -1,6 +1,7 @@
 package com.evolutiongaming.cluster.sharding
 
 import akka.actor.Address
+import cats.arrow.FunctionK
 import cats.effect.IO
 import cats.effect.concurrent.Ref
 import com.evolutiongaming.cluster.sharding.AdaptiveStrategy.Counters
@@ -24,7 +25,7 @@ class AdaptiveStrategySpec extends AsyncFunSuite with ActorSpec with Matchers {
   test("return None if all have same counters") {
     val result = for {
       ref      <- Ref[IO].of(Map.empty[AdaptiveStrategy.Key, BigInt])
-      counters  = Counters(address1, ref)
+      counters  = Counters(address1, ref).mapK(FunctionK.id)
       _        <- ref.update { map =>
         map ++ Map[AdaptiveStrategy.Key, BigInt](
           (AdaptiveStrategy.Key(address1, shard1), 2),
@@ -141,7 +142,7 @@ class AdaptiveStrategySpec extends AsyncFunSuite with ActorSpec with Matchers {
   }
 
   test("not return when counters are empty") {
-    val counters = Counters.empty[IO]
+    val counters = Counters.empty[IO].mapK(FunctionK.id)
     val result = for {
       strategy <- AdaptiveStrategy.of[IO](10, addressOf, counters)
       result   <- strategy.rebalance(allocation, Set.empty)
