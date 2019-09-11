@@ -8,7 +8,6 @@ import akka.cluster.sharding.ShardRegion.ExtractShardId
 import cats.effect.concurrent.Ref
 import cats.effect.{Resource, Sync}
 import cats.implicits._
-import cats.temp.par._
 import cats.{Applicative, FlatMap, Monad, Parallel, ~>}
 import com.evolutiongaming.catshelper._
 import com.evolutiongaming.cluster.ddata.SafeReplicator
@@ -34,7 +33,7 @@ object AdaptiveStrategy {
   }
 
 
-  def of[F[_] : Sync : Par](
+  def of[F[_] : Sync : Parallel](
     rebalanceThresholdPercent: Int,
     addressOf: AddressOf,
     counters: Counters[F]
@@ -47,7 +46,7 @@ object AdaptiveStrategy {
   }
 
 
-  def apply[F[_] : Monad : Par](
+  def apply[F[_] : Monad : Parallel](
     rebalanceThresholdPercent: Int,
     addressOf: AddressOf,
     counters: Counters[F],
@@ -378,7 +377,7 @@ object AdaptiveStrategy {
 
 object AdaptiveStrategyAndExtractShardId {
 
-  def of[F[_] : Sync : LogOf : FromFuture : ToFuture : ToTry : Par](
+  def of[F[_] : Sync : LogOf : FromFuture : ToFuture : ToTry : Parallel](
     typeName: String,
     rebalanceThresholdPercent: Int,
     msgWeight: AdaptiveStrategy.MsgWeight,

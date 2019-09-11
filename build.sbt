@@ -16,7 +16,7 @@ bintrayOrganization := Some("evolutiongaming")
 
 scalaVersion := crossScalaVersions.value.head
 
-crossScalaVersions := Seq("2.12.8")
+crossScalaVersions := Seq("2.12.10", "2.13.0")
 
 scalacOptions -= "-Ywarn-unused:params"
 

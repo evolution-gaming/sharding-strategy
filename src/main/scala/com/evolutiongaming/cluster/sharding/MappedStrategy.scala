@@ -7,7 +7,6 @@ import akka.cluster.ddata._
 import cats.effect.concurrent.Ref
 import cats.effect.{Resource, Sync}
 import cats.implicits._
-import cats.temp.par._
 import cats.{FlatMap, Parallel, ~>}
 import com.evolutiongaming.catshelper.{FromFuture, ToFuture}
 import com.evolutiongaming.cluster.ddata.SafeReplicator
@@ -19,7 +18,7 @@ import scala.util.control.NoStackTrace
 
 object MappedStrategy {
 
-  def of[F[_] : Sync : Par : FromFuture : ToFuture](
+  def of[F[_] : Sync : Parallel : FromFuture : ToFuture](
     typeName: String)(implicit
     actorSystem: ActorSystem
   ): Resource[F, ShardingStrategy[F]] = {
@@ -35,7 +34,7 @@ object MappedStrategy {
     }
   }
 
-  def apply[F[_] : FlatMap : Par](mapping: Mapping[F], addressOf: AddressOf): ShardingStrategy[F] = {
+  def apply[F[_] : FlatMap : Parallel](mapping: Mapping[F], addressOf: AddressOf): ShardingStrategy[F] = {
 
     def regionByAddress(address: Address, current: Allocation) = {
       current.keys find { region => addressOf(region) == address }
@@ -61,7 +60,9 @@ object MappedStrategy {
         } yield for {
           address <- mapping get shard
         } yield for {
-          address <- address if addressOf(region) != address && regionByAddress(address, current).isDefined
+//          address <- address if addressOf(region) != address && regionByAddress(address, current).isDefined
+          address <- address
+          _ = address if addressOf(region) != address && regionByAddress(address, current).isDefined
         } yield {
           shard
         }
