@@ -176,7 +176,7 @@ object ShardingStrategy {
         }
 
         def rebalance(current: Map[Region, IndexedSeq[Shard]], inProgress: Set[Shard]) = {
-          val allocation = if (inProgress.isEmpty) current else current.mapValues { _ filterNot inProgress }
+          val allocation = if (inProgress.isEmpty) current else current.map { case (k, v) => (k, v filterNot inProgress) }
           val shards = for {
             shards <- strategy.rebalance(allocation, inProgress)
           } yield {
