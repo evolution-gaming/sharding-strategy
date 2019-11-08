@@ -13,9 +13,8 @@ import com.evolutiongaming.catshelper._
 import com.evolutiongaming.cluster.ddata.SafeReplicator
 import com.evolutiongaming.cluster.sharding.AdaptiveStrategy.Counters
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
-import scala.util.Try
 
 /**
   * Entity related messages from clients counted and an entity shard reallocated to a node
@@ -178,7 +177,7 @@ object AdaptiveStrategy {
 
 
   def extractShardId(
-    counters: Counters[Try],
+    counters: Counters[Future],
     extractShardId: ExtractShardId,
     msgWeight: MsgWeight
   ): ExtractShardId = {
@@ -377,17 +376,13 @@ object AdaptiveStrategy {
 
 object AdaptiveStrategyAndExtractShardId {
 
-  def of[F[_] : Sync : LogOf : FromFuture : ToFuture : ToTry : Parallel](
+  def of[F[_] : Sync : LogOf : FromFuture : ToFuture : Parallel](
     typeName: String,
     rebalanceThresholdPercent: Int,
     msgWeight: AdaptiveStrategy.MsgWeight,
     extractShardId: ExtractShardId)(implicit
     actorSystem: ActorSystem
   ): Resource[F, (ShardingStrategy[F], ExtractShardId)] = {
-
-    val toTry = new (F ~> Try) {
-      def apply[A](fa: F[A]) = ToTry[F].apply(fa)
-    }
 
     val ext = Sync[F].delay { AdaptiveStrategy.Ext(actorSystem) }
 
@@ -403,8 +398,8 @@ object AdaptiveStrategyAndExtractShardId {
       counters         <- Counters.of[F](typeName, ext.replicatorRef)
       adaptiveStrategy <- Resource.liftF(adaptiveStrategy(addressOf, counters))
     } yield {
-      val countersTry = counters.mapK(toTry)
-      val adaptiveExtractShardId = AdaptiveStrategy.extractShardId(countersTry, extractShardId, msgWeight)
+      val counters1 = counters.mapK(ToFuture[F].toFunctionK)
+      val adaptiveExtractShardId = AdaptiveStrategy.extractShardId(counters1, extractShardId, msgWeight)
       (adaptiveStrategy, adaptiveExtractShardId)
     }
   }
