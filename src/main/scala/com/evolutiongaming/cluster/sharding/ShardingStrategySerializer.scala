@@ -42,9 +42,10 @@ class ShardingStrategySerializer(system: ExtendedActorSystem) extends Serializer
     val identifier = buffer.getInt()
     val manifest = readStr(buffer)
     val bytesAddress = readBytes(buffer)
-    val address =
-      if (manifest.nonEmpty) serialization.deserialize(bytesAddress, identifier, manifest).get.asInstanceOf[Address]
-      else serialization.deserialize(bytesAddress, identifier, Some(classOf[Address])).get
+    val anyRef =
+      if (manifest.nonEmpty) serialization.deserialize(bytesAddress, identifier, manifest).get
+      else serialization.deserialize(bytesAddress, identifier, classOf[Address].getName).get
+    val address = anyRef.asInstanceOf[Address]
     val shard = readStr(buffer)
     AdaptiveStrategy.Key(address, shard)
   }
