@@ -3,11 +3,12 @@ package com.evolutiongaming.cluster.sharding
 import akka.actor.Address
 import cats.Id
 import cats.implicits._
-import org.scalatest.{FunSuite, Matchers}
 
 import scala.collection.immutable.IndexedSeq
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
-class MappedStrategySpec extends FunSuite with ActorSpec with Matchers {
+class MappedStrategySpec extends AnyFunSuite with ActorSpec with Matchers {
 
   private val shard = "shard"
   private val region1 = RegionOf(actorSystem)

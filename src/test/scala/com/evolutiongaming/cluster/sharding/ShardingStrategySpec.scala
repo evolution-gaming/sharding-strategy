@@ -1,11 +1,12 @@
 package com.evolutiongaming.cluster.sharding
 
 import cats.Id
-import org.scalatest.{Matchers, WordSpec}
 
 import scala.collection.immutable.IndexedSeq
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
-class ShardingStrategySpec extends WordSpec with ActorSpec with Matchers {
+class ShardingStrategySpec extends AnyWordSpec with ActorSpec with Matchers {
 
   "ShardingStrategy" should {
 

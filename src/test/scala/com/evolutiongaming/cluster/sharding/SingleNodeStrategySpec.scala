@@ -3,11 +3,12 @@ package com.evolutiongaming.cluster.sharding
 import akka.actor.Address
 import cats.Id
 import cats.implicits._
-import org.scalatest.{FunSuite, Matchers}
 
 import scala.collection.immutable.IndexedSeq
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
-class SingleNodeStrategySpec extends FunSuite with ActorSpec with Matchers {
+class SingleNodeStrategySpec extends AnyFunSuite with ActorSpec with Matchers {
 
   private val region1 = RegionOf(actorSystem)
   private val region2 = RegionOf(actorSystem)
