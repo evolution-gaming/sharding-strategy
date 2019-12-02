@@ -6,9 +6,10 @@ import cats.effect.IO
 import cats.effect.concurrent.Ref
 import com.evolutiongaming.cluster.sharding.AdaptiveStrategy.Counters
 import com.evolutiongaming.cluster.sharding.IOSuite._
-import org.scalatest.{AsyncFunSuite, Matchers}
 
 import scala.collection.immutable.IndexedSeq
+import org.scalatest.funsuite.AsyncFunSuite
+import org.scalatest.matchers.should.Matchers
 
 class AdaptiveStrategySpec extends AsyncFunSuite with ActorSpec with Matchers {
 

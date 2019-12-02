@@ -1,9 +1,10 @@
 package com.evolutiongaming.cluster.sharding
 
 import akka.actor.{Actor, Address, Props}
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
-class AbsoluteAddressSpec extends FunSuite with ActorSpec with Matchers {
+class AbsoluteAddressSpec extends AnyFunSuite with ActorSpec with Matchers {
 
   test("AbsoluteAddress") {
     

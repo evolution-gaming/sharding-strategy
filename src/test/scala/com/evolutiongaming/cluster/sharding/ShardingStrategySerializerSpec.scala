@@ -1,9 +1,10 @@
 package com.evolutiongaming.cluster.sharding
 
 import akka.actor.{Address, ExtendedActorSystem}
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
-class ShardingStrategySerializerSpec extends FunSuite with ActorSpec with Matchers {
+class ShardingStrategySerializerSpec extends AnyFunSuite with ActorSpec with Matchers {
 
   private val address = Address("", "", "127.0.0.1", 2552)
   private val extendedActorSystem = actorSystem.asInstanceOf[ExtendedActorSystem]

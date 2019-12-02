@@ -2,12 +2,13 @@ package com.evolutiongaming.cluster.sharding
 
 import cats.effect.IO
 import com.evolutiongaming.catshelper.FromFuture
-import org.scalatest.{AsyncFunSuite, Matchers}
 import com.evolutiongaming.cluster.sharding.IOSuite._
 import com.evolutiongaming.cluster.sharding.AllocationStrategyHelper._
 
 import scala.concurrent.duration._
 import scala.collection.immutable.IndexedSeq
+import org.scalatest.funsuite.AsyncFunSuite
+import org.scalatest.matchers.should.Matchers
 
 class AllocationStrategyProxySpec extends AsyncFunSuite with ActorSpec with Matchers {
   private val region = RegionOf(actorSystem)
