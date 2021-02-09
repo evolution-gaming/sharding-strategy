@@ -2,7 +2,7 @@ package com.evolutiongaming.cluster.sharding
 
 import akka.actor.ActorRef
 import cats.Applicative
-import cats.implicits._
+import cats.syntax.all._
 
 object RemoteNodeStrategy {
 
