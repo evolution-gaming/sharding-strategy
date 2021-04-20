@@ -226,9 +226,9 @@ object AdaptiveStrategy {
       val selfUniqueAddress = Sync[F].delay { DistributedData(system).selfUniqueAddress }
       val log = LogOf[F].apply(AdaptiveStrategy.getClass)
       for {
-        log0              <- Resource.liftF(log)
+        log0              <- Resource.eval(log)
         log                = log0 prefixed typeName
-        selfUniqueAddress <- Resource.liftF(selfUniqueAddress)
+        selfUniqueAddress <- Resource.eval(selfUniqueAddress)
         result            <- of(replicator, log, selfUniqueAddress)
       } yield result
     }
@@ -247,7 +247,7 @@ object AdaptiveStrategy {
       val counters = Ref[F].of(Map.empty[Key, BigInt])
 
       for {
-        counters  <- Resource.liftF(counters)
+        counters  <- Resource.eval(counters)
         onChanged  = (data: PNCounterMap[Key]) => counters.set(data.entries)
         _         <- replicator.subscribe(().pure[F], onChanged)
       } yield {
@@ -393,10 +393,10 @@ object AdaptiveStrategyAndExtractShardId {
     }
 
     for {
-      addressOf        <- Resource.liftF(addressOf)
-      ext              <- Resource.liftF(ext)
+      addressOf        <- Resource.eval(addressOf)
+      ext              <- Resource.eval(ext)
       counters         <- Counters.of[F](typeName, ext.replicatorRef)
-      adaptiveStrategy <- Resource.liftF(adaptiveStrategy(addressOf, counters))
+      adaptiveStrategy <- Resource.eval(adaptiveStrategy(addressOf, counters))
     } yield {
       val counters1 = counters.mapK(ToFuture[F].toFunctionK)
       val adaptiveExtractShardId = AdaptiveStrategy.extractShardId(counters1, extractShardId, msgWeight)

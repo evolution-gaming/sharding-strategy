@@ -26,8 +26,8 @@ object MappedStrategy {
     val ext = Sync[F].delay { Ext(actorSystem) }
     val addressOf = Sync[F].delay { AddressOf(actorSystem) }
     for {
-      ext       <- Resource.liftF(ext)
-      addressOf <- Resource.liftF(addressOf)
+      ext       <- Resource.eval(ext)
+      addressOf <- Resource.eval(addressOf)
       mapping   <- Mapping.of[F](typeName, ext.replicatorRef)
     } yield {
       apply(mapping, addressOf)
@@ -100,7 +100,7 @@ object MappedStrategy {
       val replicator = SafeReplicator(dataKey, 1.minute, replicatorRef)
 
       for {
-        selfUniqueAddress <- Resource.liftF(selfUniqueAddress)
+        selfUniqueAddress <- Resource.eval(selfUniqueAddress)
         result            <- of(replicator, selfUniqueAddress)
       } yield result
     }
@@ -117,7 +117,7 @@ object MappedStrategy {
       val cache = Ref[F].of(Map.empty[Shard, Address])
 
       for {
-        cache     <- Resource.liftF(cache)
+        cache     <- Resource.eval(cache)
         onChanged  = (data: LWWMap[Shard, Address]) => cache.set(data.entries)
         _         <- replicator.subscribe(().pure[F], onChanged)
       } yield {
