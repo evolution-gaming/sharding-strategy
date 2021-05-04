@@ -10,6 +10,7 @@ import cats.effect.{Resource, Sync}
 import cats.implicits._
 import cats.{Applicative, FlatMap, Monad, Parallel, ~>}
 import com.evolutiongaming.catshelper._
+import com.evolutiongaming.catshelper.CatsHelper._
 import com.evolutiongaming.cluster.ddata.SafeReplicator
 import com.evolutiongaming.cluster.sharding.AdaptiveStrategy.Counters
 
@@ -226,9 +227,9 @@ object AdaptiveStrategy {
       val selfUniqueAddress = Sync[F].delay { DistributedData(system).selfUniqueAddress }
       val log = LogOf[F].apply(AdaptiveStrategy.getClass)
       for {
-        log0              <- Resource.liftF(log)
+        log0              <- log.toResource
         log                = log0 prefixed typeName
-        selfUniqueAddress <- Resource.liftF(selfUniqueAddress)
+        selfUniqueAddress <- selfUniqueAddress.toResource
         result            <- of(replicator, log, selfUniqueAddress)
       } yield result
     }
@@ -247,7 +248,7 @@ object AdaptiveStrategy {
       val counters = Ref[F].of(Map.empty[Key, BigInt])
 
       for {
-        counters  <- Resource.liftF(counters)
+        counters  <- counters.toResource
         onChanged  = (data: PNCounterMap[Key]) => counters.set(data.entries)
         _         <- replicator.subscribe(().pure[F], onChanged)
       } yield {
@@ -393,10 +394,10 @@ object AdaptiveStrategyAndExtractShardId {
     }
 
     for {
-      addressOf        <- Resource.liftF(addressOf)
-      ext              <- Resource.liftF(ext)
+      addressOf        <- addressOf.toResource
+      ext              <- ext.toResource
       counters         <- Counters.of[F](typeName, ext.replicatorRef)
-      adaptiveStrategy <- Resource.liftF(adaptiveStrategy(addressOf, counters))
+      adaptiveStrategy <- adaptiveStrategy(addressOf, counters).toResource
     } yield {
       val counters1 = counters.mapK(ToFuture[F].toFunctionK)
       val adaptiveExtractShardId = AdaptiveStrategy.extractShardId(counters1, extractShardId, msgWeight)

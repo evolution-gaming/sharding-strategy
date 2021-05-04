@@ -9,6 +9,7 @@ import cats.effect.{Resource, Sync}
 import cats.implicits._
 import cats.{FlatMap, Parallel, ~>}
 import com.evolutiongaming.catshelper.{FromFuture, ToFuture}
+import com.evolutiongaming.catshelper.CatsHelper._
 import com.evolutiongaming.cluster.ddata.SafeReplicator
 
 import scala.concurrent.ExecutionContext
@@ -26,8 +27,8 @@ object MappedStrategy {
     val ext = Sync[F].delay { Ext(actorSystem) }
     val addressOf = Sync[F].delay { AddressOf(actorSystem) }
     for {
-      ext       <- Resource.liftF(ext)
-      addressOf <- Resource.liftF(addressOf)
+      ext       <- ext.toResource
+      addressOf <- addressOf.toResource
       mapping   <- Mapping.of[F](typeName, ext.replicatorRef)
     } yield {
       apply(mapping, addressOf)
@@ -100,7 +101,7 @@ object MappedStrategy {
       val replicator = SafeReplicator(dataKey, 1.minute, replicatorRef)
 
       for {
-        selfUniqueAddress <- Resource.liftF(selfUniqueAddress)
+        selfUniqueAddress <- selfUniqueAddress.toResource
         result            <- of(replicator, selfUniqueAddress)
       } yield result
     }
@@ -117,7 +118,7 @@ object MappedStrategy {
       val cache = Ref[F].of(Map.empty[Shard, Address])
 
       for {
-        cache     <- Resource.liftF(cache)
+        cache     <- cache.toResource
         onChanged  = (data: LWWMap[Shard, Address]) => cache.set(data.entries)
         _         <- replicator.subscribe(().pure[F], onChanged)
       } yield {

@@ -1,4 +1,9 @@
-# Sharding strategies [![Build Status](https://travis-ci.org/evolution-gaming/sharding-strategy.svg)](https://travis-ci.org/evolution-gaming/sharding-strategy) [![Coverage Status](https://coveralls.io/repos/evolution-gaming/sharding-strategy/badge.svg)](https://coveralls.io/r/evolution-gaming/sharding-strategy) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/d60baa5803c542d6b4437cb2a5541ab4)](https://www.codacy.com/app/evolution-gaming/sharding-strategy?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=evolution-gaming/sharding-strategy&amp;utm_campaign=Badge_Grade) [ ![version](https://api.bintray.com/packages/evolutiongaming/maven/sharding-strategy/images/download.svg) ](https://bintray.com/evolutiongaming/maven/sharding-strategy/_latestVersion) [![License: MIT](https://img.shields.io/badge/License-MIT-yellowgreen.svg)](https://opensource.org/licenses/MIT)
+# Sharding Strategies
+[![Build Status](https://github.com/evolution-gaming/sharding-strategy/workflows/CI/badge.svg)](https://github.com/evolution-gaming/sharding-strategy/actions?query=workflow%3ACI)
+[![Coverage Status](https://coveralls.io/repos/github/evolution-gaming/sharding-strategy/badge.svg?branch=master)](https://coveralls.io/github/evolution-gaming/sharding-strategy?branch=master)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/d60baa5803c542d6b4437cb2a5541ab4)](https://www.codacy.com/app/evolution-gaming/sharding-strategy?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=evolution-gaming/sharding-strategy&amp;utm_campaign=Badge_Grade)
+[![Version](https://img.shields.io/badge/version-click-blue)](https://evolution.jfrog.io/artifactory/api/search/latestVersion?g=com.evolutiongaming&a=sharding-strategy_2.13&repos=public)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellowgreen.svg)](https://opensource.org/licenses/MIT)
 
 Alternative to [akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy](https://github.com/akka/akka/blob/master/akka-cluster-sharding/src/main/scala/akka/cluster/sharding/ShardCoordinator.scala#L72)
 
@@ -29,7 +34,7 @@ val strategy = LeastShardsStrategy()
 ## Setup
 
 ```scala
-resolvers += Resolver.bintrayRepo("evolutiongaming", "maven")
+addSbtPlugin("com.evolution" % "sbt-artifactory-plugin" % "0.0.2")
 
-libraryDependencies += "com.evolutiongaming" %% "sharding-strategy" % "1.0.2"
+libraryDependencies += "com.evolutiongaming" %% "sharding-strategy" % "1.0.6"
 ```
