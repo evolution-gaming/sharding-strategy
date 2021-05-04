@@ -27,7 +27,7 @@ class ShardingStrategySpec extends AnyWordSpec with ActorSpec with Matchers {
     }
 
     "takeShards" in {
-      val strategy = RebalanceAllStrategy().takeShards(2)
+      val strategy = RebalanceAllStrategy[Id]().takeShards(2)
       val allocation = Map(
         region1 -> IndexedSeq(shard1),
         region2 -> IndexedSeq(shard2, shard3))
@@ -36,7 +36,7 @@ class ShardingStrategySpec extends AnyWordSpec with ActorSpec with Matchers {
     }
 
     "threshold" in {
-      val strategy = RebalanceAllStrategy().rebalanceThreshold(2)
+      val strategy = RebalanceAllStrategy[Id]().rebalanceThreshold(2)
       strategy.rebalance(
         Map(region1 -> IndexedSeq(shard1), region2 -> IndexedSeq(shard2, shard3)),
         Set.empty) shouldEqual List(shard1, shard2, shard3)
@@ -47,7 +47,7 @@ class ShardingStrategySpec extends AnyWordSpec with ActorSpec with Matchers {
     }
 
     "least shards" in {
-      val strategy = LeastShardsStrategy()
+      val strategy = LeastShardsStrategy[Id]()
       strategy.allocate(region1, shard2, Map(
         region1 -> IndexedSeq(shard1),
         region2 -> IndexedSeq.empty)) shouldEqual Some(region2)
@@ -118,7 +118,7 @@ class ShardingStrategySpec extends AnyWordSpec with ActorSpec with Matchers {
 
 
     "least shards, filterRegions, threshold, takeShards" in {
-      val strategy = LeastShardsStrategy()
+      val strategy = LeastShardsStrategy[Id]()
         .rebalanceThreshold(2)
         .filterRegions(_ != region1)
         .takeShards(1)
