@@ -14,7 +14,7 @@ organizationHomepage := Some(url("http://evolution.com"))
 
 scalaVersion := crossScalaVersions.value.head
 
-crossScalaVersions := Seq("2.13.5", "2.12.13")
+crossScalaVersions := Seq("2.13.5", "2.12.15")
 
 scalacOptions -= "-Ywarn-unused:params"
 
