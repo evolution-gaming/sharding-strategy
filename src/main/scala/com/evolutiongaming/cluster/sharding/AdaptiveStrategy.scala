@@ -5,17 +5,16 @@ import akka.cluster.ddata.Replicator.{WriteConsistency, WriteLocal}
 import akka.cluster.ddata._
 import akka.cluster.sharding.ShardRegion
 import akka.cluster.sharding.ShardRegion.ExtractShardId
-import cats.effect.concurrent.Ref
-import cats.effect.{Resource, Sync}
+import cats.effect.syntax.resource._
+import cats.effect.{Ref, Resource, Sync}
 import cats.implicits._
 import cats.{Applicative, FlatMap, Monad, Parallel, ~>}
 import com.evolutiongaming.catshelper._
-import com.evolutiongaming.catshelper.CatsHelper._
 import com.evolutiongaming.cluster.ddata.SafeReplicator
 import com.evolutiongaming.cluster.sharding.AdaptiveStrategy.Counters
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Entity related messages from clients counted and an entity shard reallocated to a node

@@ -3,8 +3,6 @@ package com.evolutiongaming.cluster
 import akka.actor.ActorRef
 import akka.cluster.sharding.ShardRegion
 
-import scala.collection.immutable.IndexedSeq
-
 package object sharding {
 
   type Shard = ShardRegion.ShardId

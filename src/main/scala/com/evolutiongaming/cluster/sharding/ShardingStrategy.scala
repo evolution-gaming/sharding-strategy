@@ -1,14 +1,12 @@
 package com.evolutiongaming.cluster.sharding
 
 import akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy
-import cats.effect.concurrent.Ref
-import cats.effect.{Clock, Sync}
+import cats.effect.{Clock, Ref, Sync}
 import cats.implicits._
 import cats.{Applicative, FlatMap, Monad, ~>}
 import com.evolutiongaming.catshelper.ClockHelper._
 import com.evolutiongaming.catshelper.ToFuture
 
-import scala.collection.immutable.IndexedSeq
 import scala.concurrent.duration.FiniteDuration
 
 trait ShardingStrategy[F[_]] {
@@ -257,7 +255,7 @@ object ShardingStrategy {
     */
   object ShardRebalanceCooldown {
 
-    def of[F[_] : Sync : Clock](
+    def of[F[_] : Sync](
       cooldown: FiniteDuration,
       strategy: ShardingStrategy[F],
     ): F[ShardingStrategy[F]] = {
@@ -335,11 +333,7 @@ object ShardingStrategy {
     }
 
 
-    def shardRebalanceCooldown(
-      cooldown: FiniteDuration)(implicit
-      F: Sync[F],
-      clock: Clock[F]
-    ): F[ShardingStrategy[F]] = {
+    def shardRebalanceCooldown(cooldown: FiniteDuration)(implicit F: Sync[F]): F[ShardingStrategy[F]] = {
       ShardRebalanceCooldown.of[F](cooldown, self)
     }
 

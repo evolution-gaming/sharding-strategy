@@ -2,19 +2,21 @@ package com.evolutiongaming.cluster.sharding
 
 import cats.effect.IO
 import com.evolutiongaming.catshelper.FromFuture
-import com.evolutiongaming.cluster.sharding.IOSuite._
 import com.evolutiongaming.cluster.sharding.AllocationStrategyHelper._
-
-import scala.concurrent.duration._
-import scala.collection.immutable.IndexedSeq
+import com.evolutiongaming.cluster.sharding.IOSuite._
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 
+import scala.concurrent.duration._
+
 class AllocationStrategyProxySpec extends AsyncFunSuite with ActorSpec with Matchers {
+
+  import cats.effect.unsafe.implicits.global
+
   private val region = RegionOf(actorSystem)
   private val shard = "shard"
   private val ignore = (msg: () => String) => {msg(); ()}
-  
+
   private implicit val addressOf = AddressOf(actorSystem)
 
   test("allocate") {
