@@ -7,12 +7,11 @@ import com.evolutiongaming.cluster.sharding.IOSuite._
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 import scala.collection.immutable.IndexedSeq
+import cats.effect.unsafe.implicits.global
 
 import scala.concurrent.duration._
 
 class AllocationStrategyProxySpec extends AsyncFunSuite with ActorSpec with Matchers {
-
-  import cats.effect.unsafe.implicits.global
 
   private val region = RegionOf(actorSystem)
   private val shard = "shard"
