@@ -1,3 +1,7 @@
+## Versions
+From version `2.0.0` this library is based on **cats-effect-3**. If you want to use it with **cats-effect-2**,
+you need to use version prior to `2.0.0`, for example, `1.0.7`
+
 # Sharding Strategies
 [![Build Status](https://github.com/evolution-gaming/sharding-strategy/workflows/CI/badge.svg)](https://github.com/evolution-gaming/sharding-strategy/actions?query=workflow%3ACI)
 [![Coverage Status](https://coveralls.io/repos/github/evolution-gaming/sharding-strategy/badge.svg?branch=master)](https://coveralls.io/github/evolution-gaming/sharding-strategy?branch=master)
@@ -32,9 +36,15 @@ val strategy = LeastShardsStrategy()
 ```
 
 ## Setup
-
+For **cats-effect-3**
 ```scala
 addSbtPlugin("com.evolution" % "sbt-artifactory-plugin" % "0.0.2")
 
-libraryDependencies += "com.evolutiongaming" %% "sharding-strategy" % "1.0.6"
+libraryDependencies += "com.evolutiongaming" %% "sharding-strategy" % "2.0.0"
+```
+For **cats-effect-2**
+```scala
+addSbtPlugin("com.evolution" % "sbt-artifactory-plugin" % "0.0.2")
+
+libraryDependencies += "com.evolutiongaming" %% "sharding-strategy" % "1.0.7"
 ```
