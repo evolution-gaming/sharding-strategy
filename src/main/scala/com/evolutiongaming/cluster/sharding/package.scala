@@ -7,7 +7,7 @@ package object sharding {
 
   type Shard = ShardRegion.ShardId
   type Region = ActorRef
-  type Allocation = Map[Region, IndexedSeq[Shard]]
+  type Allocation = Map[Region, scala.collection.immutable.IndexedSeq[Shard]]
 
   type Allocate = (Region, Shard, Allocation) => Region
 

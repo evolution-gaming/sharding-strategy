@@ -7,6 +7,7 @@ import com.evolutiongaming.cluster.sharding.AdaptiveStrategy.Counters
 import com.evolutiongaming.cluster.sharding.IOSuite._
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
+import scala.collection.immutable.IndexedSeq
 
 class AdaptiveStrategySpec extends AsyncFunSuite with ActorSpec with Matchers {
 

@@ -6,6 +6,7 @@ import com.evolutiongaming.cluster.sharding.AllocationStrategyHelper._
 import com.evolutiongaming.cluster.sharding.IOSuite._
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
+import scala.collection.immutable.IndexedSeq
 
 import scala.concurrent.duration._
 
