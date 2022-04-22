@@ -4,14 +4,15 @@ object Dependencies {
 
   val scalatest        = "org.scalatest"       %% "scalatest"      % "3.2.9"
   val `executor-tools` = "com.evolutiongaming" %% "executor-tools" % "1.0.2"
-  val `cats-helper`    = "com.evolutiongaming" %% "cats-helper"    % "2.7.2"
-  val `ddata-tools`    = "com.evolutiongaming" %% "ddata-tools"    % "2.0.8"
+  val `cats-helper`    = "com.evolutiongaming" %% "cats-helper"    % "3.0.3"
+  val `ddata-tools`    = "com.evolutiongaming" %% "ddata-tools"    % "3.0.0"
   val `safe-actor`     = "com.evolutiongaming" %% "safe-actor"     % "3.0.0"
 
   object Cats {
-    private val version = "2.3.0"
+    private val version = "2.7.0"
+    private val effectVersion = "3.3.11"
     val core   = "org.typelevel" %% "cats-core"   % version
-    val effect = "org.typelevel" %% "cats-effect" % version
+    val effect = "org.typelevel" %% "cats-effect" % effectVersion
   }
 
   object Akka {

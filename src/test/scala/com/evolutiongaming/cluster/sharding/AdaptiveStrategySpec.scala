@@ -2,14 +2,12 @@ package com.evolutiongaming.cluster.sharding
 
 import akka.actor.Address
 import cats.arrow.FunctionK
-import cats.effect.IO
-import cats.effect.concurrent.Ref
+import cats.effect.{IO, Ref}
 import com.evolutiongaming.cluster.sharding.AdaptiveStrategy.Counters
 import com.evolutiongaming.cluster.sharding.IOSuite._
-
-import scala.collection.immutable.IndexedSeq
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
+import scala.collection.immutable.IndexedSeq
 
 class AdaptiveStrategySpec extends AsyncFunSuite with ActorSpec with Matchers {
 
