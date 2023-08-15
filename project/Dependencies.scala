@@ -9,7 +9,7 @@ object Dependencies {
   val `safe-actor`     = "com.evolutiongaming" %% "safe-actor"     % "3.0.0"
 
   object Cats {
-    private val version = "2.9.0"
+    private val version = "2.10.0"
     private val effectVersion = "3.4.8"
     val core   = "org.typelevel" %% "cats-core"   % version
     val effect = "org.typelevel" %% "cats-effect" % effectVersion
