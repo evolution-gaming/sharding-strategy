@@ -14,8 +14,8 @@ class AllocationStrategyProxySpec extends AsyncFunSuite with ActorSpec with Matc
   private val region = RegionOf(actorSystem)
   private val shard = "shard"
   private val ignore = (msg: () => String) => {msg(); ()}
-  
-  private implicit val addressOf = AddressOf(actorSystem)
+
+  private implicit val addressOf: AddressOf = AddressOf(actorSystem)
 
   test("allocate") {
     val allocation = Map((region, IndexedSeq(shard)))
