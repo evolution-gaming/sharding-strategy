@@ -1,6 +1,7 @@
 package com.evolutiongaming.cluster.sharding
 
 import cats.Id
+import cats.effect.SyncIO
 
 import scala.collection.immutable.IndexedSeq
 import org.scalatest.matchers.should.Matchers
@@ -44,6 +45,40 @@ class ShardingStrategySpec extends AnyWordSpec with ActorSpec with Matchers {
       strategy.rebalance(
         Map(region1 -> IndexedSeq(shard1)),
         Set.empty) shouldEqual Nil
+    }
+
+    "track unallocated" in {
+      val maxSimulations = 2
+      val test = for {
+        strategy <- RebalanceAllStrategy[SyncIO]()
+        .takeShards(SyncIO.pure(maxSimulations))
+        .withTrackUnallocated
+        initAllocation = Map(
+          region1 -> IndexedSeq(shard1, shard2, shard3, shard4, shard5),
+        )
+        rebalanceInitial <- strategy.rebalance(initAllocation, Set.empty)
+        afterShutdownAllocation = Map(
+          region1 -> IndexedSeq(shard3, shard4, shard5),
+        )
+        rebalanceAfterShutdown <- strategy.rebalance(afterShutdownAllocation, Set.empty)
+        _ <- strategy.allocate(region2, shard1, afterShutdownAllocation)
+        afterAllocateAllocation = Map(
+          region1 -> IndexedSeq(shard3, shard4, shard5),
+          region2 -> IndexedSeq(shard1)
+        )
+        rebalanceAfterAllocation <- strategy.rebalance(
+          afterAllocateAllocation,
+          Set.empty
+        )
+        _ = println(rebalanceInitial)
+        _ = println(rebalanceAfterShutdown)
+        _ = println(rebalanceAfterAllocation)
+      } yield {
+        rebalanceInitial should have size 2
+        rebalanceAfterShutdown should have size 0
+        rebalanceAfterAllocation should have size 1
+      }
+      test.unsafeRunSync()
     }
 
     "least shards" in {
