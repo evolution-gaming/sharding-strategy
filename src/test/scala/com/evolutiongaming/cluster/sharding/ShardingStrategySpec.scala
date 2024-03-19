@@ -70,9 +70,6 @@ class ShardingStrategySpec extends AnyWordSpec with ActorSpec with Matchers {
           afterAllocateAllocation,
           Set.empty
         )
-        _ = println(rebalanceInitial)
-        _ = println(rebalanceAfterShutdown)
-        _ = println(rebalanceAfterAllocation)
       } yield {
         rebalanceInitial should have size 2
         rebalanceAfterShutdown should have size 0
