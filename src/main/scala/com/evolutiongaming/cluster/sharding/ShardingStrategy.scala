@@ -303,6 +303,46 @@ object ShardingStrategy {
     }
   }
 
+  /**
+    * Adds a track of unallocated shards.
+    * If we configured sharding in such a way that it automatically re-create shards and entities inside of it after a rebalance,
+    * we know that all shards returned from rebalance call would be allocated in the nearest future.
+    * Term unallocated shard in this context means such shard that was stopped on a previous node, but not yet allocated on a new one.
+    */
+  object TrackUnallocated {
+
+    def of[F[_] : Sync](
+      strategy: ShardingStrategy[F],
+    ): F[ShardingStrategy[F]] =
+      for {
+        unallocatedShards <- Ref[F].of(Set.empty[Shard])
+      } yield {
+        apply(unallocatedShards, strategy)
+      }
+
+    def apply[F[_] : FlatMap](
+      unallocatedShards: Ref[F, Set[Shard]],
+      strategy: ShardingStrategy[F],
+    ): ShardingStrategy[F] = {
+
+      new ShardingStrategy[F] {
+
+        def allocate(requester: Region, shard: Shard, current: Allocation) =
+          for {
+            region <- strategy.allocate(requester, shard, current)
+            _ <- unallocatedShards.update(_.filterNot(_ == shard))
+          } yield region
+
+        def rebalance(current: Allocation, inProgress: Set[Shard]) =
+          for {
+            lastUnallocated <- unallocatedShards.get
+            shards <- strategy.rebalance(current, inProgress ++ lastUnallocated)
+            _ <- unallocatedShards.update(_ ++ shards)
+          } yield shards
+      }
+    }
+  }
+
 
   implicit class ShardingStrategyOps[F[_]](val self: ShardingStrategy[F]) extends AnyVal {
 
@@ -343,6 +383,8 @@ object ShardingStrategy {
       ShardRebalanceCooldown.of[F](cooldown, self)
     }
 
+    def withTrackUnallocated(implicit F: Sync[F]): F[ShardingStrategy[F]] =
+      TrackUnallocated.of(self)
 
     def toAllocationStrategy(
       fallback: Allocate = Allocate.Default)(implicit
