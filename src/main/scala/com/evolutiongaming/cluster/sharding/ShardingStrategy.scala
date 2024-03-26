@@ -9,10 +9,32 @@ import com.evolutiongaming.catshelper.ToFuture
 
 import scala.concurrent.duration.FiniteDuration
 
+/**
+  * Interface of the pluggable shard allocation and rebalancing logic used by the [[akka.cluster.sharding.ShardCoordinator]].
+  *
+  * @see check [[ShardAllocationStrategy]] from [[https://github.com/akka/akka/blob/main/akka-cluster-sharding/src/main/scala/akka/cluster/sharding/ShardCoordinator.scala]]
+  */
 trait ShardingStrategy[F[_]] {
 
+  /**
+    * Invoked when the location of a new shard is to be decided.
+    *
+    * @param requester actor reference to the [[akka.cluster.sharding.ShardRegion]] that requested the location of the
+    *                  shard, can be returned if preference should be given to the node where the shard was first accessed
+    * @param shard     the id of the shard to allocate
+    * @param current   all actor refs to `ShardRegion` and their current allocated shards, in the order they were allocated
+    * @return an effect `F` of the actor ref of the [[ShardRegion]] that is to be responsible for the shard, must be one of
+    *         the references included in the `current` parameter
+    */
   def allocate(requester: Region, shard: Shard, current: Allocation): F[Option[Region]]
 
+  /**
+    * Invoked periodically to decide which shards to rebalance to another location.
+    *
+    * @param current    all actor refs to `ShardRegion` and their current allocated shards, in the order they were allocated
+    * @param inProgress set of shards that are currently being rebalanced, i.e. you should not include these in the returned set
+    * @return an effect `F` of the shards to be migrated, may be empty to skip rebalance in this round
+    */
   def rebalance(current: Allocation, inProgress: Set[Shard]): F[List[Shard]]
 }
 
