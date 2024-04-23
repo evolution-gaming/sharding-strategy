@@ -3,26 +3,18 @@ import Dependencies._
 name := "sharding-strategy"
 
 organization := "com.evolutiongaming"
-
+organizationName := "Evolution"
+organizationHomepage := Some(url("https://evolution.com"))
 homepage := Some(url("https://github.com/evolution-gaming/sharding-strategy"))
-
 startYear := Some(2018)
 
-organizationName := "Evolution"
-
-organizationHomepage := Some(url("https://evolution.com"))
-
-scalaVersion := crossScalaVersions.value.head
-
 crossScalaVersions := Seq("2.13.13")
-
+scalaVersion := crossScalaVersions.value.head
 scalacOptions := Seq(
   "-release:17",
-  "-Xsource:3",
+  "-Xsource:3-cross",
 )
-
-//scalacOptions -= "-Ywarn-unused:params"
-
+releaseCrossBuild := true
 publishTo := Some(Resolver.evolutionReleases)
 
 libraryDependencies ++= Seq(
@@ -40,4 +32,4 @@ libraryDependencies ++= Seq(
 
 licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))
 
-releaseCrossBuild := true
+addCommandAlias("build", "all compile test")
