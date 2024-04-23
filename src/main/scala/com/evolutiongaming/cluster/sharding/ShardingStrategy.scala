@@ -2,9 +2,9 @@ package com.evolutiongaming.cluster.sharding
 
 import akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy
 import cats.effect.{Clock, Ref, Sync}
-import cats.implicits._
+import cats.implicits.*
 import cats.{Applicative, FlatMap, Monad, ~>}
-import com.evolutiongaming.catshelper.ClockHelper._
+import com.evolutiongaming.catshelper.ClockHelper.*
 import com.evolutiongaming.catshelper.ToFuture
 
 import scala.concurrent.duration.FiniteDuration

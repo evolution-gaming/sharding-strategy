@@ -8,8 +8,8 @@ class AbsoluteAddressSpec extends AnyFunSuite with ActorSpec with Matchers {
 
   test("AbsoluteAddress") {
     
-    def actor() = new Actor {
-      def receive = PartialFunction.empty
+    def actor(): Actor = new Actor {
+      def receive: Actor.Receive = PartialFunction.empty
     }
 
     val props = Props(actor())

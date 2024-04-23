@@ -1,7 +1,7 @@
 package com.evolutiongaming.cluster.sharding
 
 import cats.Applicative
-import cats.implicits._
+import cats.implicits.*
 
 object LeastShardsStrategy {
 

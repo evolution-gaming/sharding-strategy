@@ -3,17 +3,17 @@ package com.evolutiongaming.cluster.sharding
 
 import akka.actor.{ActorRef, ActorRefFactory, ActorSystem, Address, ExtendedActorSystem, Extension, ExtensionId}
 import akka.cluster.ddata.Replicator.{ReadConsistency, ReadLocal, WriteConsistency, WriteLocal}
-import akka.cluster.ddata._
+import akka.cluster.ddata.*
 import cats.effect.kernel.Ref
 import cats.effect.{Resource, Sync}
-import cats.implicits._
-import cats.effect.syntax.resource._
+import cats.implicits.*
+import cats.effect.syntax.resource.*
 import cats.{FlatMap, Parallel, ~>}
 import com.evolutiongaming.catshelper.{FromFuture, ToFuture}
 import com.evolutiongaming.cluster.ddata.SafeReplicator
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.control.NoStackTrace
 
 
@@ -196,7 +196,7 @@ object MappedStrategy {
 
   object Ext extends ExtensionId[Ext] {
 
-    def createExtension(system: ExtendedActorSystem) = new Ext {
+    def createExtension(system: ExtendedActorSystem): Ext = new Ext {
       val replicatorRef = {
         val settings = ReplicatorSettings(system)
         val props = Replicator.props(settings)

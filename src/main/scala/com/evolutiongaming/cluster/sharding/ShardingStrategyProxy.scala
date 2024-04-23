@@ -2,7 +2,7 @@ package com.evolutiongaming.cluster.sharding
 
 import akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy
 import cats.FlatMap
-import cats.implicits._
+import cats.implicits.*
 import com.evolutiongaming.catshelper.FromFuture
 
 object ShardingStrategyProxy {
