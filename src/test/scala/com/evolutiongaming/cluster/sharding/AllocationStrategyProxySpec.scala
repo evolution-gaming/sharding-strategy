@@ -2,14 +2,14 @@ package com.evolutiongaming.cluster.sharding
 
 import cats.effect.IO
 import com.evolutiongaming.catshelper.FromFuture
-import com.evolutiongaming.cluster.sharding.AllocationStrategyHelper._
-import com.evolutiongaming.cluster.sharding.IOSuite._
+import com.evolutiongaming.cluster.sharding.AllocationStrategyHelper.*
+import com.evolutiongaming.cluster.sharding.IOSuite.*
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 import scala.collection.immutable.IndexedSeq
 import cats.effect.unsafe.implicits.global
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class AllocationStrategyProxySpec extends AsyncFunSuite with ActorSpec with Matchers {
 

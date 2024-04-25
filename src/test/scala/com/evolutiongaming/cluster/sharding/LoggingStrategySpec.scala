@@ -1,7 +1,7 @@
 package com.evolutiongaming.cluster.sharding
 
 import akka.actor.Address
-import cats.implicits._
+import cats.implicits.*
 
 import scala.collection.immutable.IndexedSeq
 import org.scalatest.funsuite.AnyFunSuite
