@@ -2,7 +2,7 @@ package com.evolutiongaming.cluster.sharding
 
 import akka.actor.ActorRef
 import cats.effect.Sync
-import cats.implicits._
+import cats.implicits.*
 
 import scala.util.Random
 

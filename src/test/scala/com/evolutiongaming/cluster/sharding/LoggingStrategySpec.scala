@@ -1,7 +1,7 @@
 package com.evolutiongaming.cluster.sharding
 
 import akka.actor.Address
-import cats.implicits._
+import cats.implicits.*
 
 import scala.collection.immutable.IndexedSeq
 import org.scalatest.funsuite.AnyFunSuite
@@ -13,7 +13,7 @@ class LoggingStrategySpec extends AnyFunSuite with ActorSpec with Matchers {
   private val shard = "shard"
   private val address = Address("", "", "127.0.0.1", 2552)
 
-  private implicit val addressOf = AddressOf.const(address)
+  private implicit val addressOf: AddressOf = AddressOf.const(address)
 
   private val log = (msg: () => String) => {
     StateT { state =>

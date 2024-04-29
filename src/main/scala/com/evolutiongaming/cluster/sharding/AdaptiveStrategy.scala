@@ -1,19 +1,19 @@
 package com.evolutiongaming.cluster.sharding
 
-import akka.actor._
+import akka.actor.*
 import akka.cluster.ddata.Replicator.{WriteConsistency, WriteLocal}
-import akka.cluster.ddata._
+import akka.cluster.ddata.*
 import akka.cluster.sharding.ShardRegion
 import akka.cluster.sharding.ShardRegion.ExtractShardId
-import cats.effect.syntax.resource._
+import cats.effect.syntax.resource.*
 import cats.effect.{Ref, Resource, Sync}
-import cats.implicits._
+import cats.implicits.*
 import cats.{Applicative, FlatMap, Monad, Parallel, ~>}
-import com.evolutiongaming.catshelper._
+import com.evolutiongaming.catshelper.*
 import com.evolutiongaming.cluster.ddata.SafeReplicator
 import com.evolutiongaming.cluster.sharding.AdaptiveStrategy.Counters
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
@@ -361,7 +361,7 @@ object AdaptiveStrategy {
 
   object Ext extends ExtensionId[Ext] {
 
-    def createExtension(system: ExtendedActorSystem) = new Ext {
+    def createExtension(system: ExtendedActorSystem): Ext = new Ext {
       val replicatorRef = {
         val settings = ReplicatorSettings(system)
         val props = Replicator.props(settings)

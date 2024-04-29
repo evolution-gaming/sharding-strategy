@@ -2,17 +2,39 @@ package com.evolutiongaming.cluster.sharding
 
 import akka.cluster.sharding.ShardCoordinator.ShardAllocationStrategy
 import cats.effect.{Clock, Ref, Sync}
-import cats.implicits._
+import cats.implicits.*
 import cats.{Applicative, FlatMap, Monad, ~>}
-import com.evolutiongaming.catshelper.ClockHelper._
+import com.evolutiongaming.catshelper.ClockHelper.*
 import com.evolutiongaming.catshelper.ToFuture
 
 import scala.concurrent.duration.FiniteDuration
 
+/**
+  * Interface of the pluggable shard allocation and rebalancing logic used by the [[akka.cluster.sharding.ShardCoordinator]].
+  *
+  * @see check [[ShardAllocationStrategy]] from [[https://github.com/akka/akka/blob/main/akka-cluster-sharding/src/main/scala/akka/cluster/sharding/ShardCoordinator.scala]]
+  */
 trait ShardingStrategy[F[_]] {
 
+  /**
+    * Invoked when the location of a new shard is to be decided.
+    *
+    * @param requester actor reference to the [[akka.cluster.sharding.ShardRegion]] that requested the location of the
+    *                  shard, can be returned if preference should be given to the node where the shard was first accessed
+    * @param shard     the id of the shard to allocate
+    * @param current   all actor refs to `ShardRegion` and their current allocated shards, in the order they were allocated
+    * @return an effect `F` of the actor ref of the [[ShardRegion]] that is to be responsible for the shard, must be one of
+    *         the references included in the `current` parameter
+    */
   def allocate(requester: Region, shard: Shard, current: Allocation): F[Option[Region]]
 
+  /**
+    * Invoked periodically to decide which shards to rebalance to another location.
+    *
+    * @param current    all actor refs to `ShardRegion` and their current allocated shards, in the order they were allocated
+    * @param inProgress set of shards that are currently being rebalanced, i.e. you should not include these in the returned set
+    * @return an effect `F` of the shards to be migrated, may be empty to skip rebalance in this round
+    */
   def rebalance(current: Allocation, inProgress: Set[Shard]): F[List[Shard]]
 }
 
@@ -301,6 +323,46 @@ object ShardingStrategy {
     }
   }
 
+  /**
+    * Adds a track of unallocated shards.
+    * If we configured sharding in such a way that it automatically re-create shards and entities inside of it after a rebalance,
+    * we know that all shards returned from rebalance call would be allocated in the nearest future.
+    * Term unallocated shard in this context means such shard that was stopped on a previous node, but not yet allocated on a new one.
+    */
+  object TrackUnallocated {
+
+    def of[F[_] : Sync](
+      strategy: ShardingStrategy[F],
+    ): F[ShardingStrategy[F]] =
+      for {
+        unallocatedShards <- Ref[F].of(Set.empty[Shard])
+      } yield {
+        apply(unallocatedShards, strategy)
+      }
+
+    def apply[F[_] : FlatMap](
+      unallocatedShards: Ref[F, Set[Shard]],
+      strategy: ShardingStrategy[F],
+    ): ShardingStrategy[F] = {
+
+      new ShardingStrategy[F] {
+
+        def allocate(requester: Region, shard: Shard, current: Allocation) =
+          for {
+            region <- strategy.allocate(requester, shard, current)
+            _ <- unallocatedShards.update(_.filterNot(_ == shard))
+          } yield region
+
+        def rebalance(current: Allocation, inProgress: Set[Shard]) =
+          for {
+            lastUnallocated <- unallocatedShards.get
+            shards <- strategy.rebalance(current, inProgress ++ lastUnallocated)
+            _ <- unallocatedShards.update(_ ++ shards)
+          } yield shards
+      }
+    }
+  }
+
 
   implicit class ShardingStrategyOps[F[_]](val self: ShardingStrategy[F]) extends AnyVal {
 
@@ -337,6 +399,8 @@ object ShardingStrategy {
       ShardRebalanceCooldown.of[F](cooldown, self)
     }
 
+    def withTrackUnallocated(implicit F: Sync[F]): F[ShardingStrategy[F]] =
+      TrackUnallocated.of(self)
 
     def toAllocationStrategy(
       fallback: Allocate = Allocate.Default)(implicit

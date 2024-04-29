@@ -2,7 +2,7 @@ package com.evolutiongaming.cluster.sharding
 
 import akka.actor.Address
 import cats.Applicative
-import cats.implicits._
+import cats.implicits.*
 
 object SingleNodeStrategy {
 

@@ -1,8 +1,8 @@
 package com.evolutiongaming.cluster.sharding
 
 import cats.effect.IO
-import cats.implicits._
-import com.evolutiongaming.cluster.sharding.IOSuite._
+import cats.implicits.*
+import com.evolutiongaming.cluster.sharding.IOSuite.*
 
 import scala.collection.immutable.IndexedSeq
 import org.scalatest.funsuite.AsyncFunSuite
