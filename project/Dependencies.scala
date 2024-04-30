@@ -16,7 +16,7 @@ object Dependencies {
   }
 
   object Akka {
-    private val version = "2.6.20"
+    private val version = "2.6.21"
     val actor              = "com.typesafe.akka" %% "akka-actor"            % version
     val cluster            = "com.typesafe.akka" %% "akka-cluster"          % version
     val sharding           = "com.typesafe.akka" %% "akka-cluster-sharding" % version
