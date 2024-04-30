@@ -19,7 +19,6 @@ publishTo := Some(Resolver.evolutionReleases)
 
 libraryDependencies ++= Seq(
   `ddata-tools`,
-  `safe-actor`,
   `cats-helper`,
   Akka.actor,
   Akka.`distributed-data`,
