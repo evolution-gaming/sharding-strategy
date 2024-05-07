@@ -8,11 +8,11 @@ organizationHomepage := Some(url("https://evolution.com"))
 homepage := Some(url("https://github.com/evolution-gaming/sharding-strategy"))
 startYear := Some(2018)
 
-crossScalaVersions := Seq("2.13.13")
+crossScalaVersions := Seq("2.13.14")
 scalaVersion := crossScalaVersions.value.head
 scalacOptions := Seq(
   "-release:17",
-  "-Xsource:3-cross",
+  "-Xsource:3",
 )
 releaseCrossBuild := true
 publishTo := Some(Resolver.evolutionReleases)
