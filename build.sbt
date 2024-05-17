@@ -18,6 +18,12 @@ releaseCrossBuild := true
 publishTo := Some(Resolver.evolutionReleases) // sbt-release
 versionPolicyIntention := Compatibility.BinaryCompatible // sbt-version-policy
 
+// TODO remove after 3.0.2 is released
+versionPolicyIgnored := Seq(
+  "com.evolutiongaming" %% "nel",
+  "com.evolutiongaming" %% "safe-actor",
+)
+
 libraryDependencies ++= Seq(
   `ddata-tools`,
   `cats-helper`,
