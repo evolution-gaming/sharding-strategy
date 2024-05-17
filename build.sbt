@@ -1,4 +1,4 @@
-import Dependencies._
+import Dependencies.*
 
 name := "sharding-strategy"
 
@@ -15,7 +15,8 @@ scalacOptions := Seq(
   "-Xsource:3",
 )
 releaseCrossBuild := true
-publishTo := Some(Resolver.evolutionReleases)
+publishTo := Some(Resolver.evolutionReleases) // sbt-release
+versionPolicyIntention := Compatibility.BinaryCompatible // sbt-version-policy
 
 libraryDependencies ++= Seq(
   `ddata-tools`,
@@ -31,4 +32,7 @@ libraryDependencies ++= Seq(
 
 licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))
 
+//addCommandAlias("fmt", "scalafixAll; all scalafmtAll scalafmtSbt")
+//addCommandAlias("check", "scalafixEnable; scalafixAll --check; all versionPolicyCheck scalafmtCheckAll scalafmtSbtCheck")
+addCommandAlias("check", "versionPolicyCheck")
 addCommandAlias("build", "all compile test")
