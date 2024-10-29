@@ -14,7 +14,6 @@ scalacOptions := Seq(
   "-release:17",
   "-Xsource:3",
 )
-releaseCrossBuild := true
 publishTo := Some(Resolver.evolutionReleases) // sbt-release
 versionPolicyIntention := Compatibility.BinaryCompatible // sbt-version-policy
 
