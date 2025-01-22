@@ -7,7 +7,7 @@ object Dependencies {
   val `ddata-tools` = "com.evolutiongaming" %% "ddata-tools" % "4.0.0"
 
   object Cats {
-    private val version = "2.12.0"
+    private val version = "2.13.0"
     private val effectVersion = "3.5.7"
     val core   = "org.typelevel" %% "cats-core"   % version
     val effect = "org.typelevel" %% "cats-effect" % effectVersion
