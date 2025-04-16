@@ -4,7 +4,7 @@ object Dependencies {
 
   val scalatest     = "org.scalatest"       %% "scalatest"   % "3.2.19"
   val `cats-helper` = "com.evolutiongaming" %% "cats-helper" % "3.12.0"
-  val `ddata-tools` = "com.evolutiongaming" %% "ddata-tools" % "4.0.0"
+  val `ddata-tools` = "com.evolutiongaming" %% "ddata-tools" % "4.0.1"
 
   object Cats {
     private val version = "2.13.0"
