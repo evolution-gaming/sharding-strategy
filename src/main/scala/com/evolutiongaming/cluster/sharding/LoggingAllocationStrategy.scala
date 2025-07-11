@@ -22,7 +22,7 @@ object LoggingAllocationStrategy {
       } mkString ", "
     }
 
-    def iterToStr(iter: Iterable[_]) = {
+    def iterToStr(iter: Iterable[?]) = {
       iter.toSeq.map { _.toString }.sorted.mkString("[", ",", "]")
     }
 

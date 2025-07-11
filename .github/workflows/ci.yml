@@ -11,6 +11,7 @@ jobs:
       matrix:
         scala:
           - 2.13.16
+          - 3.3.6
 
     steps:
       - uses: actions/checkout@v4
@@ -27,11 +28,15 @@ jobs:
       - name: setup SBT
         uses: sbt/setup-sbt@v1
 
+      - name: check code ${{ matrix.scala }}
+        run: sbt ++${{ matrix.scala }} clean check
+
       - name: build ${{ matrix.scala }}
-        run: sbt ++${{ matrix.scala }} clean check coverage test
+        run: sbt ++${{ matrix.scala }} clean coverage test
 
       - name: test coverage
         if: success()
+        run: sbt ++${{ matrix.scala }} coverageAggregate coveralls
         env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-        run: sbt ++${{ matrix.scala }} coverageReport coverageAggregate coveralls
+          COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERALLS_FLAG_NAME: Scala ${{ matrix.scala }}
