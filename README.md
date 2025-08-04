@@ -5,7 +5,7 @@ you need to use version prior to `2.0.0`, for example, `1.0.7`
 # Sharding Strategies
 [![Build Status](https://github.com/evolution-gaming/sharding-strategy/workflows/CI/badge.svg)](https://github.com/evolution-gaming/sharding-strategy/actions?query=workflow%3ACI)
 [![Coverage Status](https://coveralls.io/repos/github/evolution-gaming/sharding-strategy/badge.svg?branch=master)](https://coveralls.io/github/evolution-gaming/sharding-strategy?branch=master)
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/d60baa5803c542d6b4437cb2a5541ab4)](https://www.codacy.com/app/evolution-gaming/sharding-strategy?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=evolution-gaming/sharding-strategy&amp;utm_campaign=Badge_Grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/28e7bcc12b3c4dcfa55a17a648f72ee0)](https://app.codacy.com/gh/evolution-gaming/sharding-strategy/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![Version](https://img.shields.io/badge/version-click-blue)](https://evolution.jfrog.io/artifactory/api/search/latestVersion?g=com.evolutiongaming&a=sharding-strategy_2.13&repos=public)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellowgreen.svg)](https://opensource.org/licenses/MIT)
 
