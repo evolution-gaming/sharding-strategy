@@ -8,7 +8,7 @@ organizationHomepage := Some(url("https://evolution.com"))
 homepage := Some(url("https://github.com/evolution-gaming/sharding-strategy"))
 startYear := Some(2018)
 
-crossScalaVersions := Seq("2.13.16", "3.3.7")
+crossScalaVersions := Seq("2.13.17", "3.3.7")
 scalaVersion := crossScalaVersions.value.head
 scalacOptions := Seq(
   "-release:17",
