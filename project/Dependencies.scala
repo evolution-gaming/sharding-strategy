@@ -2,7 +2,7 @@ import sbt.*
 
 object Dependencies {
 
-  val scalatest     = "org.scalatest"       %% "scalatest"   % "3.2.19"
+  val scalatest     = "org.scalatest"       %% "scalatest"   % "3.2.20"
   val `cats-helper` = "com.evolutiongaming" %% "cats-helper" % "3.12.2"
   val `ddata-tools` = "com.evolutiongaming" %% "ddata-tools" % "4.1.0"
 
