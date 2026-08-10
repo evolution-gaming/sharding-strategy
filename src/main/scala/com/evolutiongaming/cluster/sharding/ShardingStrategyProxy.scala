@@ -7,7 +7,7 @@ import com.evolutiongaming.catshelper.FromFuture
 
 object ShardingStrategyProxy {
 
-  def apply[F[_] : FlatMap : FromFuture](strategy: ShardAllocationStrategy): ShardingStrategy[F] = {
+  def apply[F[_]: FlatMap: FromFuture](strategy: ShardAllocationStrategy): ShardingStrategy[F] = {
 
     new ShardingStrategy[F] {
 

@@ -5,7 +5,7 @@ import cats.implicits.*
 
 object LeastShardsStrategy {
 
-  def apply[F[_] : Applicative](): ShardingStrategy[F] = new ShardingStrategy[F] {
+  def apply[F[_]: Applicative](): ShardingStrategy[F] = new ShardingStrategy[F] {
 
     val reversedOrdering = Ordering[Int].reverse
 

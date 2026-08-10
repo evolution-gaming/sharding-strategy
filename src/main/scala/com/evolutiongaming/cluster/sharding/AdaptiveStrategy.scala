@@ -1,8 +1,8 @@
 package com.evolutiongaming.cluster.sharding
 
 import akka.actor.*
-import akka.cluster.ddata.Replicator.{WriteConsistency, WriteLocal}
 import akka.cluster.ddata.*
+import akka.cluster.ddata.Replicator.{WriteConsistency, WriteLocal}
 import akka.cluster.sharding.ShardRegion
 import akka.cluster.sharding.ShardRegion.ExtractShardId
 import cats.effect.syntax.resource.*
@@ -17,9 +17,9 @@ import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
-  * Entity related messages from clients counted and an entity shard reallocated to a node
-  * which receives most of client messages for the corresponding entity
-  */
+ * Entity related messages from clients counted and an entity shard reallocated to a node which
+ * receives most of client messages for the corresponding entity
+ */
 
 object AdaptiveStrategy {
 
@@ -31,11 +31,10 @@ object AdaptiveStrategy {
     lazy val Increment: MsgWeight = _ => 1
   }
 
-
-  def of[F[_] : Sync : Parallel](
+  def of[F[_]: Sync: Parallel](
     rebalanceThresholdPercent: Int,
     addressOf: AddressOf,
-    counters: Counters[F]
+    counters: Counters[F],
   ): F[ShardingStrategy[F]] = {
     for {
       toRebalance <- Ref[F].of(Map.empty[Shard, Address])
@@ -44,8 +43,7 @@ object AdaptiveStrategy {
     }
   }
 
-
-  def apply[F[_] : Monad : Parallel](
+  def apply[F[_]: Monad: Parallel](
     rebalanceThresholdPercent: Int,
     addressOf: AddressOf,
     counters: Counters[F],
@@ -73,7 +71,7 @@ object AdaptiveStrategy {
 
       home match {
         case Some(home) => counters get home map { counter => fix(home, counter) } getOrElse counters
-        case None       =>
+        case None =>
           if (counters.isEmpty) counters
           else {
             val (homeGuess, counter) = counters maxBy { case (_, counter) => counter }
@@ -108,20 +106,20 @@ object AdaptiveStrategy {
 
           for {
             address <- address
-            region  <- current.keys find { region => addressOf(region) == address }
+            region <- current.keys find { region => addressOf(region) == address }
           } yield region
         }
 
         for {
           toRebalance1 <- toRebalance.get
-          counters1    <- counters.get(shard, addresses)
-          region        = regionOf(counters1, toRebalance1)
-           _           <- region.foldMapM { _ =>
-             for {
-               _ <- counters.reset(shard, addresses)
-               _ <- toRebalance.update(_ - shard)
-             } yield {}
-           }
+          counters1 <- counters.get(shard, addresses)
+          region = regionOf(counters1, toRebalance1)
+          _ <- region.foldMapM { _ =>
+            for {
+              _ <- counters.reset(shard, addresses)
+              _ <- toRebalance.update(_ - shard)
+            } yield {}
+          }
         } yield region
       }
 
@@ -157,14 +155,17 @@ object AdaptiveStrategy {
 
         val result = for {
           (region, shards) <- current
-          address           = addressOf(region)
-          shard            <- shards
-        } yield for {
-          address <- rebalance(shard, address)
-          shard   <- address.fold(none[Shard].pure[F]) { address => toRebalance.update(_.updated(shard, address)).as(shard.some) }
-        } yield {
-          shard
-        }
+          address = addressOf(region)
+          shard <- shards
+        } yield
+          for {
+            address <- rebalance(shard, address)
+            shard <- address.fold(none[Shard].pure[F]) { address =>
+              toRebalance.update(_.updated(shard, address)).as(shard.some)
+            }
+          } yield {
+            shard
+          }
 
         for {
           result <- Parallel.parSequence(result.toList)
@@ -175,11 +176,10 @@ object AdaptiveStrategy {
     }
   }
 
-
   def extractShardId(
     counters: Counters[Future],
     extractShardId: ExtractShardId,
-    msgWeight: MsgWeight
+    msgWeight: MsgWeight,
   ): ExtractShardId = {
 
     case msg: ShardRegion.StartEntity => extractShardId(msg)
@@ -190,7 +190,6 @@ object AdaptiveStrategy {
       if (weight > 0) counters.increase(shardId, weight)
       shardId
   }
-
 
   trait Counters[F[_]] {
 
@@ -203,7 +202,7 @@ object AdaptiveStrategy {
 
   object Counters {
 
-    def empty[F[_] : Applicative]: Counters[F] = new Counters[F] {
+    def empty[F[_]: Applicative]: Counters[F] = new Counters[F] {
 
       def increase(shard: Shard, weight: Weight) = ().pure[F]
 
@@ -212,11 +211,11 @@ object AdaptiveStrategy {
       def get(shard: Shard, addresses: Set[Address]) = Map.empty[Address, BigInt].pure[F]
     }
 
-
-    def of[F[_] : Sync : LogOf : FromFuture : ToFuture](
+    def of[F[_]: Sync: LogOf: FromFuture: ToFuture](
       typeName: String,
-      replicatorRef: ActorRef)(implicit
-      system: ActorSystem
+      replicatorRef: ActorRef,
+    )(implicit
+      system: ActorSystem,
     ): Resource[F, Counters[F]] = {
 
       implicit val consistency = WriteLocal
@@ -226,36 +225,37 @@ object AdaptiveStrategy {
       val selfUniqueAddress = Sync[F].delay { DistributedData(system).selfUniqueAddress }
       val log = LogOf[F].apply(AdaptiveStrategy.getClass)
       for {
-        log0              <- log.toResource
-        log                = log0 prefixed typeName
+        log0 <- log.toResource
+        log = log0 prefixed typeName
         selfUniqueAddress <- selfUniqueAddress.toResource
-        result            <- of(replicator, log, selfUniqueAddress)
+        result <- of(replicator, log, selfUniqueAddress)
       } yield result
     }
 
-
-    def of[F[_] : Sync](
+    def of[F[_]: Sync](
       replicator: SafeReplicator[F, PNCounterMap[Key]],
       log: Log[F],
-      selfUniqueAddress: SelfUniqueAddress)(implicit
+      selfUniqueAddress: SelfUniqueAddress,
+    )(implicit
       consistency: WriteConsistency,
       executor: ExecutionContext,
-      refFactory: ActorRefFactory
+      refFactory: ActorRefFactory,
     ): Resource[F, Counters[F]] = {
-      
+
       val address = selfUniqueAddress.uniqueAddress.address
       val counters = Ref[F].of(Map.empty[Key, BigInt])
 
       for {
-        counters  <- counters.toResource
-        onChanged  = (data: PNCounterMap[Key]) => counters.set(data.entries)
-        _         <- replicator.subscribe(().pure[F], onChanged)
+        counters <- counters.toResource
+        onChanged = (data: PNCounterMap[Key]) => counters.set(data.entries)
+        _ <- replicator.subscribe(().pure[F], onChanged)
       } yield {
-        
-        def update(onSuccess: => String, onFailure: => String)(modify: PNCounterMap[Key] => PNCounterMap[Key]): F[Unit] = {
+
+        def update(onSuccess: => String, onFailure: => String)(modify: PNCounterMap[Key] => PNCounterMap[Key])
+          : F[Unit] = {
           val result = for {
             result <- replicator.update { value => modify(value getOrElse PNCounterMap.empty) }
-            _      <- log.debug(onSuccess)
+            _ <- log.debug(onSuccess)
           } yield {
             result
           }
@@ -293,8 +293,8 @@ object AdaptiveStrategy {
             } yield {
               val result = for {
                 address <- addresses
-                key      = Key(address, shard)
-                counter  = counters.getOrElse(key, BigInt(0))
+                key = Key(address, shard)
+                counter = counters.getOrElse(key, BigInt(0))
               } yield {
                 (address, counter)
               }
@@ -305,8 +305,7 @@ object AdaptiveStrategy {
       }
     }
 
-
-    def apply[F[_] : FlatMap](address: Address, ref: Ref[F, Map[Key, BigInt]]): Counters[F] = {
+    def apply[F[_]: FlatMap](address: Address, ref: Ref[F, Map[Key, BigInt]]): Counters[F] = {
       new Counters[F] {
 
         def increase(shard: Shard, weight: Weight) = {
@@ -328,8 +327,8 @@ object AdaptiveStrategy {
           } yield {
             val result = for {
               address <- addresses
-              key      = Key(address, shard)
-              counter  = counters.getOrElse(key, BigInt(0))
+              key = Key(address, shard)
+              counter = counters.getOrElse(key, BigInt(0))
             } yield {
               (address, counter)
             }
@@ -338,7 +337,6 @@ object AdaptiveStrategy {
         }
       }
     }
-
 
     implicit class CounterOps[F[_]](val self: Counters[F]) extends AnyVal {
 
@@ -352,7 +350,6 @@ object AdaptiveStrategy {
       }
     }
   }
-
 
   trait Ext extends Extension {
 
@@ -373,15 +370,15 @@ object AdaptiveStrategy {
   final case class Key(address: Address, shard: Shard)
 }
 
-
 object AdaptiveStrategyAndExtractShardId {
 
-  def of[F[_] : Sync : LogOf : FromFuture : ToFuture : Parallel](
+  def of[F[_]: Sync: LogOf: FromFuture: ToFuture: Parallel](
     typeName: String,
     rebalanceThresholdPercent: Int,
     msgWeight: AdaptiveStrategy.MsgWeight,
-    extractShardId: ExtractShardId)(implicit
-    actorSystem: ActorSystem
+    extractShardId: ExtractShardId,
+  )(implicit
+    actorSystem: ActorSystem,
   ): Resource[F, (ShardingStrategy[F], ExtractShardId)] = {
 
     val ext = Sync[F].delay { AdaptiveStrategy.Ext(actorSystem) }
@@ -393,9 +390,9 @@ object AdaptiveStrategyAndExtractShardId {
     }
 
     for {
-      addressOf        <- addressOf.toResource
-      ext              <- ext.toResource
-      counters         <- Counters.of[F](typeName, ext.replicatorRef)
+      addressOf <- addressOf.toResource
+      ext <- ext.toResource
+      counters <- Counters.of[F](typeName, ext.replicatorRef)
       adaptiveStrategy <- adaptiveStrategy(addressOf, counters).toResource
     } yield {
       val counters1 = counters.mapK(ToFuture[F].toFunctionK)
