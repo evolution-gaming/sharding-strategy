@@ -2,10 +2,10 @@ package com.evolutiongaming.cluster.sharding
 
 import akka.actor.Address
 import cats.implicits.*
-
-import scala.collection.immutable.IndexedSeq
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+
+import scala.collection.immutable.IndexedSeq
 
 class LoggingStrategySpec extends AnyFunSuite with ActorSpec with Matchers {
 
@@ -41,13 +41,11 @@ class LoggingStrategySpec extends AnyFunSuite with ActorSpec with Matchers {
     shards shouldEqual List(shard)
   }
 
-
   case class State(records: List[String])
 
   object State {
     val Empty: State = State(List.empty)
   }
-
 
   type StateT[A] = cats.data.StateT[cats.Id, State, A]
 

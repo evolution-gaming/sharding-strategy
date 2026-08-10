@@ -13,7 +13,7 @@ object IOSuite {
   val Timeout: FiniteDuration = 5.seconds
 
   implicit val executor: ExecutionContextExecutor = ExecutionContext.global
-  implicit val fromFutureIO: FromFuture[IO]       = FromFuture.lift[IO]
+  implicit val fromFutureIO: FromFuture[IO] = FromFuture.lift[IO]
 
   def runIO[A](io: IO[A], timeout: FiniteDuration = Timeout): Future[Succeeded.type] = {
     io.timeout(timeout).as(Succeeded).unsafeToFuture()

@@ -6,11 +6,11 @@ import cats.implicits.*
 
 object RemoteNodeStrategy {
 
-  def apply[F[_] : Applicative]: ShardingStrategy[F] = {
+  def apply[F[_]: Applicative]: ShardingStrategy[F] = {
     apply(_.path.address.hasLocalScope)
   }
 
-  def apply[F[_] : Applicative](isLocal: ActorRef => Boolean): ShardingStrategy[F] = {
+  def apply[F[_]: Applicative](isLocal: ActorRef => Boolean): ShardingStrategy[F] = {
     new ShardingStrategy[F] {
 
       def allocate(requester: ActorRef, shard: Shard, current: Allocation) = {

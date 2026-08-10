@@ -2,12 +2,12 @@ package com.evolutiongaming.cluster.sharding
 
 import akka.actor.Address
 import cats.Id
-import cats.implicits.*
 import cats.catsParallelForId
-
-import scala.collection.immutable.IndexedSeq
+import cats.implicits.*
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+
+import scala.collection.immutable.IndexedSeq
 
 class MappedStrategySpec extends AnyFunSuite with ActorSpec with Matchers {
 
@@ -22,7 +22,7 @@ class MappedStrategySpec extends AnyFunSuite with ActorSpec with Matchers {
       def apply(region: Region) = region match {
         case `region1` => address1
         case `region2` => address2
-        case _         => region.path.address
+        case _ => region.path.address
       }
     }
     val mapping = new MappedStrategy.Mapping[Id] {
@@ -36,8 +36,8 @@ class MappedStrategySpec extends AnyFunSuite with ActorSpec with Matchers {
     (shard, allocation, address, expected) <- List(
       (shard, Map((region1, IndexedSeq.empty[Shard]), (region2, IndexedSeq.empty[Shard])), none[Address], none[Region]),
       (shard, Map((region1, IndexedSeq.empty[Shard]), (region2, IndexedSeq.empty[Shard])), address1.some, region1.some),
-      (shard, Map((region1, IndexedSeq(shard)),       (region2, IndexedSeq.empty[Shard])), none[Address], none[Region]),
-      (shard, Map((region1, IndexedSeq(shard)),       (region2, IndexedSeq.empty[Shard])), address1.some, region1.some)
+      (shard, Map((region1, IndexedSeq(shard)), (region2, IndexedSeq.empty[Shard])), none[Address], none[Region]),
+      (shard, Map((region1, IndexedSeq(shard)), (region2, IndexedSeq.empty[Shard])), address1.some, region1.some),
     )
   } {
     test(s"allocate shard: $shard, address: $address, allocation: $allocation") {
@@ -48,12 +48,12 @@ class MappedStrategySpec extends AnyFunSuite with ActorSpec with Matchers {
 
   for {
     (allocation, address, expected) <- List(
-      (Map((region1, IndexedSeq.empty[Shard])),                        none[Address], List.empty[Shard]),
-      (Map((region1, IndexedSeq.empty[Shard])),                        address1.some, List.empty[Shard]),
-      (Map((region1, IndexedSeq(shard))),                              none[Address], List.empty[Shard]),
-      (Map((region1, IndexedSeq(shard))),                              address1.some, List.empty[Shard]),
-      (Map((region1, IndexedSeq.empty[Shard])),                        address2.some, List.empty[Shard]),
-      (Map((region1, IndexedSeq(shard)), (region2, IndexedSeq.empty)), address2.some, List(shard))
+      (Map((region1, IndexedSeq.empty[Shard])), none[Address], List.empty[Shard]),
+      (Map((region1, IndexedSeq.empty[Shard])), address1.some, List.empty[Shard]),
+      (Map((region1, IndexedSeq(shard))), none[Address], List.empty[Shard]),
+      (Map((region1, IndexedSeq(shard))), address1.some, List.empty[Shard]),
+      (Map((region1, IndexedSeq.empty[Shard])), address2.some, List.empty[Shard]),
+      (Map((region1, IndexedSeq(shard)), (region2, IndexedSeq.empty)), address2.some, List(shard)),
     )
   } {
     test(s"rebalance address: $address, allocation: $allocation") {

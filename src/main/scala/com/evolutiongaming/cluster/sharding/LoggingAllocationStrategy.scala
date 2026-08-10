@@ -9,8 +9,9 @@ object LoggingAllocationStrategy {
   def apply(
     log: (() => String) => Unit,
     strategy: ShardAllocationStrategy,
-    addressOf: AddressOf)(implicit
-    executor: ExecutionContext
+    addressOf: AddressOf,
+  )(implicit
+    executor: ExecutionContext,
   ): ShardAllocationStrategy = {
 
     def allocationToStr(current: Allocation) = {

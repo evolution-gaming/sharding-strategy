@@ -3,10 +3,10 @@ package com.evolutiongaming.cluster.sharding
 import cats.effect.IO
 import cats.implicits.*
 import com.evolutiongaming.cluster.sharding.IOSuite.*
-
-import scala.collection.immutable.IndexedSeq
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
+
+import scala.collection.immutable.IndexedSeq
 
 class AlwaysRebalanceStrategySpec extends AsyncFunSuite with ActorSpec with Matchers {
   private val region = RegionOf(actorSystem)

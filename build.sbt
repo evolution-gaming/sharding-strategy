@@ -47,13 +47,15 @@ libraryDependencies ++= Seq(
   Akka.testkit % Test,
   Cats.core,
   Cats.effect,
-  scalatest % Test)
+  scalatest % Test,
+)
 
 licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))
 
 //addCommandAlias("fmt", "all scalafmtAll scalafmtSbt")
 //addCommandAlias("check", "all versionPolicyCheck scalafmtCheckAll scalafmtSbtCheck")
-addCommandAlias("check", "+versionPolicyCheck")
+addCommandAlias("check", "+all scalafmtCheckRepo")
+addCommandAlias("fmt", "+scalafmtRepo")
 addCommandAlias("build", "+all compile test")
 
 def crossSettings[T](scalaVersion: String, if3: T, if2: T): T = {

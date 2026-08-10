@@ -13,7 +13,6 @@ object AddressOf {
     (region: Region) => absoluteAddress(region.path.address)
   }
 
-
   def const(address: Address): AddressOf = new AddressOf {
     def apply(region: Region): Address = address
   }

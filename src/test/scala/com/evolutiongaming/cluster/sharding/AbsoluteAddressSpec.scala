@@ -7,7 +7,7 @@ import org.scalatest.matchers.should.Matchers
 class AbsoluteAddressSpec extends AnyFunSuite with ActorSpec with Matchers {
 
   test("AbsoluteAddress") {
-    
+
     def actor(): Actor = new Actor {
       def receive: Actor.Receive = PartialFunction.empty
     }

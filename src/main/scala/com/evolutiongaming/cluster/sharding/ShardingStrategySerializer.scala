@@ -1,9 +1,9 @@
 package com.evolutiongaming.cluster.sharding
 
-import java.nio.ByteBuffer
-
 import akka.actor.{Address, ExtendedActorSystem}
 import akka.serialization.{SerializationExtension, SerializerWithStringManifest}
+
+import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets.UTF_8
 
 class ShardingStrategySerializer(system: ExtendedActorSystem) extends SerializerWithStringManifest {
@@ -18,14 +18,14 @@ class ShardingStrategySerializer(system: ExtendedActorSystem) extends Serializer
   def manifest(x: AnyRef): String = {
     x match {
       case _: AdaptiveStrategy.Key => ManifestOld
-      case _                       => sys.error(s"Cannot serialize message of ${ x.getClass } in ${ getClass.getName }")
+      case _ => sys.error(s"Cannot serialize message of ${ x.getClass } in ${ getClass.getName }")
     }
   }
 
   def toBinary(x: AnyRef): Array[Byte] = {
     x match {
       case x: AdaptiveStrategy.Key => strategyKeyToBinary(x)
-      case _                       => sys.error(s"Cannot serialize message of ${ x.getClass } in ${ getClass.getName }")
+      case _ => sys.error(s"Cannot serialize message of ${ x.getClass } in ${ getClass.getName }")
     }
   }
 
@@ -33,7 +33,7 @@ class ShardingStrategySerializer(system: ExtendedActorSystem) extends Serializer
     manifest match {
       case ManifestOld => strategyKeyFromBinary(bytes)
       case ManifestNew => strategyKeyFromBinary(bytes)
-      case _           => sys.error(s"Cannot deserialize message for manifest $manifest in ${ getClass.getName }")
+      case _ => sys.error(s"Cannot deserialize message for manifest $manifest in ${ getClass.getName }")
     }
   }
 
@@ -56,8 +56,8 @@ class ShardingStrategySerializer(system: ExtendedActorSystem) extends Serializer
     val bytesAddress = serializer.toBinary(address)
     val manifest = serializer match {
       case serializer: SerializerWithStringManifest => serializer.manifest(address)
-      case _ if serializer.includeManifest          => address.getClass.getName
-      case _                                        => ""
+      case _ if serializer.includeManifest => address.getClass.getName
+      case _ => ""
     }
     val bytesManifest = manifest.getBytes(UTF_8)
     val bytesShard = x.shard.getBytes(UTF_8)
@@ -84,4 +84,3 @@ class ShardingStrategySerializer(system: ExtendedActorSystem) extends Serializer
     bytes
   }
 }
-

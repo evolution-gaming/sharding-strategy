@@ -10,14 +10,15 @@ object AllocationStrategyHelper {
 
   implicit class AllocationStrategyOps(val self: ShardAllocationStrategy) extends AnyVal {
 
-    def toShardingStrategy[F[_] : FlatMap : FromFuture]: ShardingStrategy[F] = {
+    def toShardingStrategy[F[_]: FlatMap: FromFuture]: ShardingStrategy[F] = {
       ShardingStrategyProxy(self)
     }
 
     def logging(
-      log: (() => String) => Unit)(implicit
+      log: (() => String) => Unit,
+    )(implicit
       addressOf: AddressOf,
-      executor: ExecutionContext
+      executor: ExecutionContext,
     ): ShardAllocationStrategy = {
       LoggingAllocationStrategy(log, self, addressOf)
     }
