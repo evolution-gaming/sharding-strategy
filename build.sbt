@@ -4,8 +4,8 @@ name := "sharding-strategy"
 
 organization := "com.evolutiongaming"
 organizationName := "Evolution"
-organizationHomepage := Some(url("https://evolution.com"))
-homepage := Some(url("https://github.com/evolution-gaming/sharding-strategy"))
+organizationHomepage := Some(uri("https://evolution.com"))
+homepage := Some(uri("https://github.com/evolution-gaming/sharding-strategy"))
 startYear := Some(2018)
 
 crossScalaVersions := Seq("2.13.18", "3.3.8")
@@ -50,13 +50,13 @@ libraryDependencies ++= Seq(
   scalatest % Test,
 )
 
-licenses := Seq(("MIT", url("https://opensource.org/licenses/MIT")))
+licenses := Seq(("MIT", uri("https://opensource.org/licenses/MIT")))
 
 //addCommandAlias("fmt", "all scalafmtAll scalafmtSbt")
 //addCommandAlias("check", "all versionPolicyCheck scalafmtCheckAll scalafmtSbtCheck")
 addCommandAlias("check", "+all scalafmtCheckRepo")
 addCommandAlias("fmt", "+scalafmtRepo")
-addCommandAlias("build", "+all compile test")
+addCommandAlias("build", "+all compile testFull")
 
 def crossSettings[T](scalaVersion: String, if3: T, if2: T): T = {
   scalaVersion match {
