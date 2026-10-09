@@ -38,8 +38,7 @@ publishTo := Some(Resolver.evolutionReleases) // sbt-release
 versionPolicyIntention := Compatibility.BinaryCompatible // sbt-version-policy
 versionPolicyIgnored ++= Seq(
   // add libraries here that are known to be binary compatible, like:
-  // TODO remove after next release, this project doesn't use doobie module
-  "com.evolutiongaming" %% "smetrics",
+//  "com.evolutiongaming" %% "smetrics",
 )
 
 libraryDependencies ++= Seq(
