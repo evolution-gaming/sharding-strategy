@@ -36,6 +36,11 @@ scalacOptions ++= crossSettings(
 )
 publishTo := Some(Resolver.evolutionReleases) // sbt-release
 versionPolicyIntention := Compatibility.BinaryCompatible // sbt-version-policy
+versionPolicyIgnored ++= Seq(
+  // add libraries here that are known to be binary compatible, like:
+  // TODO remove after next release, this project doesn't use doobie module
+  "com.evolutiongaming" %% "smetrics",
+)
 
 libraryDependencies ++= Seq(
   `ddata-tools`,
@@ -52,10 +57,8 @@ libraryDependencies ++= Seq(
 
 licenses := Seq(("MIT", uri("https://opensource.org/licenses/MIT")))
 
-//addCommandAlias("fmt", "all scalafmtAll scalafmtSbt")
-//addCommandAlias("check", "all versionPolicyCheck scalafmtCheckAll scalafmtSbtCheck")
-addCommandAlias("check", "+all scalafmtCheckRepo")
-addCommandAlias("fmt", "+scalafmtRepo")
+addCommandAlias("check", "all versionPolicyCheck scalafmtCheckRepo")
+addCommandAlias("fmt", "scalafmtRepo")
 addCommandAlias("build", "+all compile testFull")
 
 def crossSettings[T](scalaVersion: String, if3: T, if2: T): T = {
